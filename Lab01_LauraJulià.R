@@ -3,7 +3,7 @@ liuid = "lauju103"
 
 # 1.1.1
 my_num_vector <- function(){
-  return(c(log10(11), cos(pi/5),exp(pi/3), (1173 %% 7)/19),5)
+  c(log10(11), cos(pi/5),exp(pi/3), (1173 %% 7)/19)
 }
 my_num_vector()
 
@@ -16,7 +16,7 @@ filter_my_vector(x = c(2, 9, 2, 4, 102), leq = 4)
 
 # 1.1.3
 dot_prod <- function(a,b){
- return(sum(a*b))
+  sum(a*b)
 }
 dot_prod(a = c(3,1,12,2,4), b = c(1,2,3,4,5))
 dot_prod(a = c(-1,3), b = c(-3,-1))
@@ -31,7 +31,7 @@ approx_e(N = 4)
 
 e <- 0
 n <- 1
-while(i < 50){
+while(n < 50){
   e <- round(approx_e(N = n),5)
   if (e == round(exp(1),5)){
     print(n)
@@ -50,7 +50,7 @@ my_magic_matrix() # all numbers are different and each row, column and diagonal 
 
 # 1.2.2
 calculate_elements <- function(A){
-  return(dim(A)[1]*dim(A)[2])
+  return(nrow(A)*ncol(A))
 }
 
 mat <- my_magic_matrix()
@@ -127,7 +127,7 @@ my_data.frame()
 
 # 1.4.2
 sort_head <- function(df, var.name, n){
-  return(df[order(df[var.name], decreasing = T),][1:n,])
+  df[order(df[var.name], decreasing = TRUE),][1:n,]
 }
 data(iris)
 sort_head(df = iris, var.name = "Petal.Length", n = 5)
@@ -142,7 +142,7 @@ add_median_variable <- function(df, j){
     }else if(df[i,j] < median(df[,j])){
       df[i, "compared_to_median"] <- "Smaller"
     }else{
-      df[i, "compared_to_median"] <- "Grater"
+      df[i, "compared_to_median"] <- "Greater"
     }
   }
   return(df)
@@ -154,12 +154,12 @@ tail(add_median_variable(df = faithful, 2))
 
 # 1.4.4
 analyze_columns <- function(df, j){
-  v1 <- c(round(mean(df[,j[1]]),4), round(median(df[,j[1]]),4), round(sd(df[,j[1]]),4))
-  v2 <- c(round(mean(df[,j[2]]),4), round(median(df[,j[2]]),4), round(sd(df[,j[2]]),4))
+  v1 <- c(mean(df[,j[1]]), median(df[,j[1]]), sd(df[,j[1]]))
+  v2 <- c(mean(df[,j[2]]), median(df[,j[2]]), sd(df[,j[2]]))
   names<- c("mean","median","sd")
   names(v1) <- names
   names(v2) <- names
-  sol <- list(v1,v2,round(cor(df[,c(j[1],j[2])]),5))
+  sol <- list(v1,v2,cor(df[,c(j[1],j[2])]))
   names(sol)<- c(colnames(df)[j[1]],colnames(df)[j[2]],"correlation_matrix")
   return(sol)
 }

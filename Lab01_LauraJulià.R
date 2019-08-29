@@ -1,20 +1,15 @@
-# Name: Laura Julià Melis 
-# LIU-ID: lauju103
+name = "Laura Julià Melis"
+liuid = "lauju103"
 
 # 1.1.1
 my_num_vector <- function(){
-  return(round(c(log10(11), cos(pi/5),exp(pi/3), (1173 %% 7)/19),5))
+  return(c(log10(11), cos(pi/5),exp(pi/3), (1173 %% 7)/19),5)
 }
 my_num_vector()
 
 # 1.1.2
 filter_my_vector <- function(x, leq){
-  for (i in 1:length(x)){
-    if(x[i]>=leq){
-       x[i]<- NA
-    }
-  }
-  return(x)
+  return(replace(x, x >= leq, NA))
 }
 
 filter_my_vector(x = c(2, 9, 2, 4, 102), leq = 4)

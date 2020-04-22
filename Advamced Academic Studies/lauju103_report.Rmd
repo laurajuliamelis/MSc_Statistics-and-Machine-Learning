@@ -1,0 +1,50 @@
+---
+title: 'Advanced Academic Studies: Project Work'
+subtitle: 'Equal opportunities in the context of higher education in Europe'
+author: "Laura Julià Melis"
+date: '19 September 2019'
+output: pdf_document
+bibliography: lauju103_references.bib
+---
+# Abstract
+This paper reviews various articles about the real situation of equal opportunities in the context of higher education in different European Union countries focusing especially on the areas around the students' family background and students with disabilities. Although equal opportunities in education are considered as to be a major concern by the European institutions and universities and that there are a good few laws and statutes to promote and guarantee equal opportunities in the field of education, after considering and critically analysing the existing literature on this topic, it has been shown that changes must be made to achieve true equality, and it is strongly recommended more consistent research without the limitations that current studies have shown to have.
+
+# 1. Introduction
+The European Union (EU) was founded on the values of equality among all its citizens and one of the main concerns of all the EU institutions is the right to equal opportunities in different fields, including education. Therefore, the European Commission presented the European Pillar of Social Rights [@european_comission] on 26 April 2017. This document states that *"regardless of gender, racial or ethnic origin, religion or belief, disability, age or sexual orientation, everyone has the right to equal treatment and opportunities regarding employment, social protection, education [...]"*. Further, it specifically proclaims the importance of encouraging equality of opportunities of marginalized groups.
+
+Nevertheless, the fact that there is equality legislation in education does not necessary mean that inequality and discrimination are eliminated. Diverse studies show that features such as family background [@background], disability [@disabilities], gender [@gender] or income [@income] are strongly related to student performances. For this reason, this report aims to describe the real situation of equal opportunities in higher education in some EU countries concentrating on the results obtained in the first two aforementioned studies, in addition to providing an opinion and critical analysis of them.
+
+# 2. Critical analysis
+This section is divided into two subsections: family background (2.1) and students with disabilities (2.2). For each topic, a study related to that matter will be discussed presenting the methodology used and the results obtained, as well as making a critical review.
+
+## 2.1. Family background 
+Intending to acquire empirical and consistent evidence to evaluate the degree of equality of opportunities in education across countries, @background in his study *"How equal are educational opportunities? Family background and student achievement in Europe and the United States"* analysed data from the Third International Mathematics and Science Study (TIMSS)^[Database available at https://nces.ed.gov/timss/idetimss/.], a comparative study than consisted of two exams (in mathematics and science) and a questionnaire to collect personal and family information.
+
+Regarding the methodology of the study, Woessmann explains that the target population of the survey was 13-year-old students from 18 different countries (17 Western Europe countries and the United States of America). Sample selection was carried out through a stratified design: first, schools in each country were selected randomly and then, one class within the selected schools was also randomly chosen. Thus, all the students of the class performed the TIMSS test. This could be a limitation because it might exist a correlation between students of the same class, so it might have been better to randomize the selection of individuals (students) and not schools and classes. Furthermore, the sample sizes for each country were different so weighted least squared had to be used.
+
+The equality degree was quantified with an econometric model where the test score of each student was the dependent variable. The independent variables, related to the students' family background, were the following: "Parent's education level", "Number of books at home" and "Living (or not) with both parents". It might have been convenient also to be provided with more information on the questionnaire such as parent's income or ethnic origin since it has been shown that these are characteristics that influence the achievements of the students [@parents_influence].  
+
+Missing data was very high in some countries which thing is always supposed to be a big problem to ensure good estimations [@missingdata], thereby a specific method to impute missing data had to be used. However, an analysis of these cases could have been done to detect possible common features in them (e.g. seventy percent of the missing data cases were students living with only one of their parents and the mean TIMSS test score of this group was slightly under the global mean so that could lead to a conclusion of a possible correlation between "not living with both parents" and "student's educational performance").
+
+The results concerning the effect of the family background of a student on his test performance showed that the parent's education level, as well as the number of books in the student's home, were two characteristics strongly related with the output: these two variables were positively significant. This means that in the majority of the European countries, the higher the education level of the parents is or the number of books they have in their house, the higher the score of the students.  Despite that, it is important to mention some possible limitations of this model because interactions between variables were not analysed and the R-squared measures obtained were quite low so that the goodness-of-fit of the model (how the predicted model fits the data) is poor [@r_squared].
+
+To summarize, choosing a high-quality sample would have been better to obtain more consistent results as well as taking into account interactions and correlations between the variables used to build the econometric model. Nevertheless, the results showed differences in the students' performances due to their family background and this means that in the practice, opportunities in education are not equal for all the students.
+
+## 2.2. Students with disabilities
+There are multiple definitions for **disability** depending on the context. In this paper, the term will be used according to the World Health Organization definition [@who_disability]: *Disability [...] involves dysfunctioning at one or more of these same levels: impairments, activity limitations, and participation restrictions*.
+
+In his study, *The experience of higher education from the perspective of disabled students*, @disabilities examined how disabled students feel about their contact with higher education by conducting semi-structured interviews with various disabled students from a university in the United Kingdom.
+
+Concerning the investigation methodology, the sample selection was "self-selected": an invitation letter was sent to several disabled students out of a total of 171 disabled students at the university and six of them decided to participate in the study. This means that only 3.5% of the target population was considered, so it would have been better to use a random sample selection as well as study a higher proportion of students to achieve a representative sample and consequently, more consistent results.
+
+However, the author makes it clear that, after the interviews, he was able to realize that some concerns were present in all students. These issues were: **(i)** disabled students are responsible for the expenses that their specific and individual learning needs cost, **(ii)** assistance from external agencies is needed because the Disability Unit in the university does not offer support for all types of disabilities (e.g. visual-impaired students), **(iii)** there is no general code of practice for support or administrative staff for them to know how to act and what their responsibilities are so disabled students have to spend a lot of time organizing, asking and solving their problems by their own.
+
+As a result, this study was able to show that inequalities of opportunities in higher education are present because students with disabilities must be able to cover additional financial costs and devote much extra time to organize and fight to obtain individual support for them.
+
+# 3. Conclusion
+Having commented on the various studies that have been carried out to describe how the situation in the EU countries is in terms of equal opportunities in the context of higher education, it has become clear that more statutes and code practices need to be established. Also, it might be necessary to train university and academic workers as well as create or improve support units to offer collective solutions to those marginalized or minority groups.
+
+# 4. Discussion
+Despite the results described in both studies and their importance to improve equal opportunities in higher education, they have a few limitations that have already been noticed in Section 2: poor or small sample selections, omitting variable interactions in the model, missing data and low goodness-of-fit measures. Although these studies extend the knowledge about the experiences of students with features that may influence their academic achievements, future research studies without restrictions would be needed.
+
+# References

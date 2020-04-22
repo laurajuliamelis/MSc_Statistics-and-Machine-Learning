@@ -1,0 +1,22 @@
+Package: rSwedishParliamentVotations
+Type: Package
+Title: API for Votations in the Swedish Parliment
+Version: 1.0.0
+Date: 2019-09-25
+Authors@R: as.person(c(
+    "Laura Julià Melis <laaurajulia@gmail.com> [aut, cre]",
+    "Martin Svensson <martin.k.r.svensson@gmail.com> [aut]"
+  ))
+Description: The rSwedishParliamentVotations package contains a function GET_votation, used to query information for votations in the Swedish Parliment.
+License: MIT + file LICENSE
+Encoding: UTF-8
+RoxygenNote: 6.1.1
+VignetteBuilder: knitr
+Depends: R (>= 3.5.0)
+Imports: 
+    xml2
+Suggests: 
+    roxygen2,
+    testthat,
+    knitr,
+    rmarkdown

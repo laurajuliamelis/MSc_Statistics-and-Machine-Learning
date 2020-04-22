@@ -1,0 +1,34 @@
+Package: awesomebonus
+Type: Package
+Title: Ridge Regression Package
+Version: 1.0.0
+Date: 2019-10-13
+Authors@R: as.person(c(
+    "Martin Svensson <martin.k.r.svensson@gmail.com> [aut, cre]", 
+    "Laura Julià Melis <laaurajulia@gmail.com> [aut]"
+  ))
+Description: The awesomebonus package contains a class ridgereg, that will do ridge regression.
+License: MIT + file LICENSE
+Encoding: UTF-8
+RoxygenNote: 6.1.1
+VignetteBuilder: knitr
+Depends: R (>= 3.5.0)
+Imports: 
+    methods,
+    ggplot2,
+    dplyr,
+    nycflights13,
+    maps,
+    caret,
+    corrplot,
+    mlbench,
+    MASS,
+    rlang
+Suggests: 
+    roxygen2,
+    testthat,
+    knitr,
+    rmarkdown,
+    stats,
+    leaps
+    

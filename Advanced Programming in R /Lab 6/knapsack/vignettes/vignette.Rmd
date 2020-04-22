@@ -1,0 +1,210 @@
+---
+title: "knapsack: A package to solve the knapsack problem."
+author: "Laura Julià Melis and Martin Svensson"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{knapsack: A package to solve the knapsack problem.}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+## 1. Introduction.
+
+The knapsack problem is a discrete optimization problem where we have a knapsack that can take a limited weight $W$ and we want to fill this knapsack with a number of items $i = 1,...,n$, each with a weight $w_i$ and a value $v_i$. The goal is to find the knapsack with the largest value of the elements added to the knapsack.
+
+This package contains three different functions that are three different approaches (of different complexity) to solve the problem raised above. These three functions have the same structure: 
+
+**Inputs**
+
+  - **x:** an object of class data.frame with two variables v (values) and w (weights).
+  - **w:** numeric scalar object that represents the knapsack size.
+
+**Output**
+
+The functions return a list with two elements: the elements added to the knapsack and the maximum knapsack value.
+
+### Instalation.
+The first thing to do to be able to acces the functions is to install and load the package.
+```{r, message=FALSE, warning=FALSE}
+# You may need to install and load this package first: install.packages("devtools")
+library(devtools)
+
+# devtools::install_github("laurajuliamelis/Lab6",subdir="knapsack")
+library(knapsack)
+```
+
+## 2. Functions.  
+
+### 2.0. Example data. 
+
+The data used as an example to show how the functions work in the following sections is generated as showed below.
+
+```{r}
+set.seed(42)
+n <- 2000
+knapsack_objects <- data.frame( w=sample(1:4000, size = n, replace = TRUE),
+                                v=runif(n = n, 0, 10000))
+```
+
+### 2.1. brute_force_knapsack( ).
+
+This function uses the brute force search algorithm. This algorithms works by going through all possible alternatives (all possible combinations $2^n$ are evaluated) and return the maximum value found.
+
+**Example**
+```{r}
+brute_force_knapsack(x = knapsack_objects[1:8,], W = 3500)
+```
+
+**QUESTION: How much time does it takes to run the algorithm for n = 16 objects?**
+
+We will use the function `microbenchmark` to measure the time that it takes to evaluate this function:
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:16,], W = 3500), times = 5)
+```
+
+It takes a mean of 1.9533 seconds.
+
+### 2.2. knapsack_dynamic( ). 
+
+This function uses the dynamic programming algorithm. This algorithm works by iterating over all possible values of w (see *References* for more information).
+
+**Example**
+```{r}
+knapsack_dynamic(x = knapsack_objects[1:8,], W = 3500)
+```
+
+**QUESTION: How much time does it takes to run the algorithm for n = 500 objects?**
+```{r, eval=FALSE}
+microbenchmark(knapsack_dynamic(x = knapsack_objects[1:500,], W = 3500), times = 5)
+```
+
+It takes a mean of 2.805 seconds.
+
+
+### 2.3. greedy_knapsack( ).
+
+This function uses the greedy approximation algorithm. This algorithm works by: (i) Computing the value-to-weight ratios, (ii) sorting the items in decreasing order of the value-to-weight ratios and (iii) placing the sorted items in the knapsack until the current weight is higher than the knapsack capacity W.
+
+**Example**
+```{r}
+greedy_knapsack(x = knapsack_objects[1:8,], W = 3500)
+```
+
+**QUESTION: How much time does it takes to run the algorithm for n = 1000000 objects?**
+```{r, eval=FALSE}
+set.seed(42)
+n <- 1000000
+knapsack_objects <- data.frame( w=sample(1:4000, size = n, replace = TRUE),
+                                v=runif(n = n, 0, 10000))
+
+microbenchmark(greedy_knapsack(x = knapsack_objects[1:1000000,], W = 3500), times = 5)
+```
+
+It takes a mean of 343.213 milliseconds.
+
+## 3. Profiling and optimization.
+**NOTE:** Package `lineprof` is not available for R version 3.6.1, so we will use package `profvis` instead.
+
+### 3.1.  Brute force search algorithm.
+```{r, eval=FALSE}
+profvis(brute_force_knapsack(x = knapsack_objects[1:16,], W = 3500))
+```
+
+### 3.2. Dynamic programming algorithm.
+```{r, eval=FALSE}
+profvis(knapsack_dynamic(x = knapsack_objects[1:500,], W = 3500))
+```
+
+### 3.3. Greddy approximation algorithm.
+```{r, eval=FALSE}
+profvis(greedy_knapsack(x = knapsack_objects[1:1000000,], W = 3500))
+```
+
+**QUESTION: What performance gain could you get by trying to improving your code?**
+
+After analyzing the `profvis` outputs we consider that, regarding the `brute_force_knapsack()` and the `greedy_knapsack()` functions, they are fast enough given the large amount of data they are evaluating. 
+
+Concerning the `knapsack_dynamic()` function, we can see how there are some lines of code that are a bit time consuming.
+
+So maybe we could get a performance gain in this algorithm by using Rcpp and C++, but the gain would be really small.
+
+
+## 4. Implentation in `Rcpp`.
+
+Process time with `fast=FALSE` (by default the function doesn't use the Rcpp implementation):
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:16,], W = 3500), times = 5)
+```
+
+The mean process time is 2.189957 seconds.
+
+Process time with `fast=TRUE`:
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:16,], W = 3500, fast= TRUE), times = 5)
+```
+
+The mean process time is 0.381 seconds.
+
+**QUESTION: What performance gain could you get by using Rcpp and C++?**
+
+We could get a mean performance gain of 0.684 seconds. 
+
+## 5. Parallelization of brute force search.
+
+**QUESTION: What performance gain could you get by parallelizing brute force search?**
+
+  -**If n=16.**
+  
+Process time with `parallel=FALSE` (by default):
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:16,], W = 3500), times = 5)
+```
+
+The mean process time is 2.169381 seconds.
+
+Process time with `parallel=TRUE` :
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:16,], W = 3500, parallel = TRUE), times = 5)
+```
+
+The mean process time in this case is 1.485746 seconds.
+
+We could get a mean performance gain of 0.684 seconds. 
+
+  -**If n=20.**
+  
+Process time with `parallel=FALSE` (by default):
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:20,], W = 3500), times = 1)
+```
+
+The mean process time is 34.19686 seconds. 
+
+Process time with `parallel=TRUE` :
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:20,], W = 3500, parallel = TRUE), times = 1)
+```
+
+The mean process time in this case is 17.93422 seconds. 
+
+So, whith n= 20 we could get a mean performance gain of 16.263 seconds. 
+
+Process time with `parallel=TRUE` and `fast=TRUE`:
+```{r, eval=FALSE}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:20,], W = 3500, parallel = TRUE, fast=TRUE), times = 1)
+```
+
+The mean process time is 15.71219 seconds. So the mean gain performance in this case would be 2.2 seconds. 
+
+We observe how the mean process time difference increases between the parallel and the serial programming as the n increases as well. Also, there is an overhead time for creating the parallelization of one to two seconds, so the execution time has to be larger in order to get a gain.
+
+### Benchmark specifications. 
+
+  - **OS type:** unix.
+  - **CPU model:** Intel(R) Core(TM) i5-5250U CPU @ 1.60GHz.
+  - **Cores:** 4
+
+## References.
+* Brute force algorithm: <https://en.wikipedia.org/wiki/Knapsack_problem>
+* Dynamic problem algorithm: <https://en.wikipedia.org/wiki/Knapsack_problem#0.2F1_knapsack_problem>
+* Greedy approximation algorithm: <https://en.wikipedia.org/wiki/Knapsack_problem#Greedy_approximation_algorithm>

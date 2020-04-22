@@ -1,0 +1,19 @@
+#' awesomebonus: A Ridge regression package.
+#'
+#' The awesomebonus package contains an object with class \code{ridgereg}, created with the RC object oriented system.
+#' This object is helpful to handle ridge regression models as it provides multiple methods such as \code{predict()} and
+#' \code{coef()} to predict using the fitted model and the regressions coefficients of a given regression model, respectively.
+#' 
+#' @section Class object:
+#' \code{ridgereg()} calculates various statistics related to the ridge regression model and contains multiple methods to obtain the regression coefficients or the predicted values, among others.
+#' 
+#' @author
+#' Martin Svensson and Laura Julia Melis.
+#' 
+#' Course in Advanced Programming in R.
+#' 
+#' Departmenf of Computer and Information Science, Linköping University.
+#' 
+#' @docType package
+#' @name awesomebonus
+NULL

@@ -1,0 +1,24 @@
+Package: knapsack
+Type: Package
+Title: The knapsak problem.
+Version: 1.0.0
+Date: 2019-10-11
+Authors@R: as.person(c(
+    "Laura Julià Melis <laaurajulia@gmail.com> [aut, cre]",
+    "Martin Svensson <martin.k.r.svensson@gmail.com> [aut]"
+  ))
+Description: This package contains three different functions that are three different approaches (of different complexity) to solve the knapsack problem.
+License: MIT + file LICENSE
+Encoding: UTF-8
+RoxygenNote: 6.1.1
+VignetteBuilder: knitr
+Depends: R (>= 3.5.0)
+LinkingTo: Rcpp
+Imports: 
+    Rcpp
+Suggests: 
+    roxygen2,
+    testthat,
+    knitr,
+    rmarkdown,
+    devtools

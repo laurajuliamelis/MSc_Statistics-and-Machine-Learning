@@ -1,0 +1,248 @@
+---
+title: "knapsack: A package to solve the knapsack problem."
+author: "Laura Julià Melis and Martin Svensson"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{knapsack: A package to solve the knapsack problem.}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+## 1. Introduction.
+
+The knapsack problem is a discrete optimization problem where we have a knapsack that can take a limited weight $W$ and we want to fill this knapsack with a number of items $i = 1,...,n$, each with a weight $w_i$ and a value $v_i$. The goal is to find the knapsack with the largest value of the elements added to the knapsack.
+
+This package contains three different functions that are three different approaches (of different complexity) to solve the problem raised above. These three functions have the same structure: 
+
+**Inputs**
+
+  - **x:** an object of class data.frame with two variables v (values) and w (weights).
+  - **w:** numeric scalar object that represents the knapsack size.
+
+**Output**
+
+The functions return a list with two elements: the elements added to the knapsack and the maximum knapsack value.
+
+### Instalation.
+The first thing to do to be able to acces the functions is to install and load the package. But first we may ne
+```{r, message=FALSE, warning=FALSE}
+# You may need to install and load this package first: install.packages("devtools")
+library(devtools)
+
+# devtools::install_github("laurajuliamelis/Lab6",subdir="knapsack")
+# library(knapsack)
+```
+
+```{r include=FALSE}
+# We need this package to measure the time that it takes to evaluate the functions.
+#install.packages("microbenchmark")
+library(microbenchmark)
+```
+
+
+## 2. Functions.  
+
+### 2.0. Example data. 
+
+The data used as an example to show how the functions work in the following sections is generated as showed below.
+
+```{r}
+set.seed(42)
+n <- 2000
+knapsack_objects <- data.frame( w=sample(1:4000, size = n, replace = TRUE),
+                                v=runif(n = n, 0, 10000))
+```
+
+### 2.1. brute_force_knapsack( ).
+
+This function uses the brute force search algorithm. This algorithms works by going through all possible alternatives (all possible combinations $2^n$ are evaluated) and return the maximum value found.
+
+```{r include=FALSE}
+## THIS WILL BE REMOVED WHEN THE PACKAGE INSTALATION IS WORKING.
+brute_force_knapsack <- function(x, W){
+  combn <- 1:(2^nrow(x))
+  bin <- matrix(NA, nrow=2^nrow(x), ncol=nrow(x))
+  for(i in 1:(2^nrow(x))){
+    bin[i,]<- as.integer(head(intToBits(combn[i]), nrow(x))) 
+  }
+  
+  weight <- W
+  elements <- vector()
+  value <- 0
+  for(i in 1:nrow(bin)){
+    temp_weight <- sum(x[,1][as.logical(bin[i,])])
+   
+     if(temp_weight <= W){
+      temp_value <- sum(x[,2][as.logical(bin[i,])])
+      
+      if(temp_value > value || (temp_value == value && temp_weight < weight)){
+        weight <- temp_weight
+        value <- temp_value
+        elements <- which(as.logical(bin[i,]))
+      }
+    }
+  }
+  
+  return(list("value"=value, "elements"=elements))
+}
+```
+
+**Example**
+```{r}
+brute_force_knapsack(x = knapsack_objects[1:8,], W = 3500)
+```
+
+**QUESTION: How much time does it takes to run the algorithm for n = 16 objects?**
+
+We will use the function `microbenchmark` to measure the time that it takes to evaluate this function:
+```{r}
+microbenchmark(brute_force_knapsack(x = knapsack_objects[1:8,], W = 3500))
+# RUN BEFORE SUBMITTING
+# microbenchmark(brute_force_knapsack(x = knapsack_objects[1:16,], W = 3500))
+```
+
+
+### 2.2. knapsack_dynamic( ). 
+
+This function uses the dynamic programming algorithm. This algorithm works by iterating over all possible values of w (see *References* for more information).
+
+```{r include=FALSE}
+## THIS WILL BE REMOVED WHEN THE PACKAGE INSTALATION IS WORKING.
+knapsack_dynamic <- function(x, W){
+  
+  # Output equals 0 when there are no items to pick or the knapsack can hold 0 weight units
+  if(nrow(x)==0 || W==0){
+    return(list("value"=0, "elements"="None"))
+  }
+  
+  # Create m array for the values
+  m <- matrix(nrow = W+1 , ncol= nrow(x)+1) 
+  m[1, ] <- 0 # Row 1 represents that the knapsack can hold 0 weight units
+  m[, 1] <- 0 # Column 1 represents 0 items to pick up
+  
+  # Create m array for the elements.
+  m_item<-matrix('', nrow =W+1 , ncol= nrow(x)+1)
+  
+  # When other input values:
+  for (j in 1:nrow(x)){ # j in cols
+    temp_weight<-x$w[j]
+    item <- j
+    temp_value <- x$v[j]
+    
+    for(i in 1:W){ # i in rows
+      if(temp_weight > i){ 
+       
+        m[i+1,j+1] <- m[i+1,j]
+        m_item[i+1,j+1] <- m_item[i+1,j]
+      
+      }else{ 
+       
+         if(m[i+1,j] >= m[i+1-temp_weight,j]+temp_value){
+          m[i+1,j+1] <- m[i+1,j]
+          m_item[i+1,j+1] <- m_item[i+1,j]
+        }else{
+          m[i+1,j+1] <- (m[i+1-temp_weight,j]+temp_value)
+          m_item[i+1,j+1] <- item
+        }
+        
+      }
+    }
+  }
+  
+  # Obtaining the chosen elements:
+  n_row <-nrow(m)
+  n_col<-ncol(m)
+  items<-c()
+  selected_item<-m_item[n_row,n_col]
+  
+  while(selected_item!='')
+  {
+    selected_item<-m_item[n_row,n_col]
+    if(selected_item!='')
+    {
+      selected_item_value<-x[selected_item,]
+      if(-m[n_row - selected_item_value$w,n_col-1]+m[n_row,n_col]==selected_item_value$v)
+      {
+        n_row <- n_row - selected_item_value$w
+        items<-c(items,selected_item)
+      }
+      n_col <- n_col - 1
+    }
+  }
+  return(list("value"=m[nrow(m),ncol(m)], "elements"=sort(as.numeric(items))))
+}
+```
+
+**Example**
+```{r}
+knapsack_dynamic(x = knapsack_objects[1:8,], W = 3500)
+```
+
+**QUESTION: How much time does it takes to run the algorithm for n = 500 objects?**
+```{r}
+microbenchmark(knapsack_dynamic(x = knapsack_objects[1:8,], W = 3500))
+# RUN BEFORE SUBMITTING: 
+# microbenchmark(knapsack_dynamic(x = knapsack_objects[1:500,], W = 3500))
+```
+
+### 2.3. greedy_knapsack( ).
+
+This function uses the greedy approximation algorithm. This algorithm works by: (i) Computing the value-to-weight ratios, (ii) sorting the items in decreasing order of the value-to-weight ratios and (iii) placing the sorted items in the knapsack until the current weight is higher than the knapsack capacity W.
+
+```{r include=FALSE}
+## THIS WILL BE REMOVED WHEN THE PACKAGE INSTALATION IS WORKING.
+greedy_knapsack <- function(x, W){
+  x$r <- x$v / x$w
+  sort_x <- x[order(x$r, decreasing = T),]
+  
+  sum_weight <-0
+  value <- 0
+  elements <- vector()
+  for(i in 1: nrow(sort_x)){
+
+    sum_weight <- sum(sum_weight, sort_x$w[i])
+    
+    if(sum_weight < W){
+      value <- sum(value, sort_x$v[i])
+      elements <- c(elements, row.names(sort_x)[i])
+    }else{
+      return(list("value"=value, "elements"=sort(as.numeric(elements))))
+    }
+    
+  }
+}
+```
+
+**Example**
+```{r}
+greedy_knapsack(x = knapsack_objects[1:8,], W = 3500)
+```
+
+**QUESTION: How much time does it takes to run the algorithm for n = 1000000 objects?**
+```{r}
+set.seed(42)
+n <- 1000000
+knapsack_objects <- data.frame( w=sample(1:4000, size = n, replace = TRUE),
+                                v=runif(n = n, 0, 10000))
+# RUN BEFORE SUBMITTING
+# microbenchmark(greedy_knapsack(x = knapsack_objects[1:1000000,], W = 3500))
+
+microbenchmark(greedy_knapsack(x = knapsack_objects[1:8,], W = 3500))
+```
+
+## 3. Profiling and optimization.
+
+**QUESTION: What performance gain could you get by trying to improving your code?**
+
+## 4. Implentation in `Rcpp`.
+
+**QUESTION: What performance gain could you get by using Rcpp and C++?**
+
+## 5. Parallelization of brute force search.
+
+**QUESTION: What performance gain could you get by parallelizing brute force search?**
+
+## References.
+* Brute force algorithm: <https://en.wikipedia.org/wiki/Knapsack_problem>
+* Dynamic problem algorithm: <https://en.wikipedia.org/wiki/Knapsack_problem#0.2F1_knapsack_problem>
+* Greedy approximation algorithm: <https://en.wikipedia.org/wiki/Knapsack_problem#Greedy_approximation_algorithm>

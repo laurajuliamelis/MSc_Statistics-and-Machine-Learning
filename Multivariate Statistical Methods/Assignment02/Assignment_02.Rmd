@@ -1,0 +1,531 @@
+---
+title: "Assignment 2: Inference about mean vectors"
+subtitle:  "Group 12"
+author: "Dávid Hrabovszki (davhr856), Laura Julia Melis (lauju103), Spyridon Dimitriadis (spydi472), Vasileia Kampouraki (vaska979)"
+date: "25/11/2019"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F, error = F)
+```
+
+```{r, echo=FALSE}
+# NEEDED LIBRARIES
+library(ggplot2)
+library(tidyr)
+library(gridExtra)
+library(car)
+library(heplots)
+library(MASS)
+library(fmsb)
+
+RNGversion('3.5.1')
+```
+
+
+# Question 1: Test of outliers.
+```{r echo=FALSE}
+##################--QUESTION 1--##################
+#read data
+data1 <- read.table("T1-9.dat", stringsAsFactors = FALSE)
+colnames(data1) <- c("Country", "100m", "200m", "400m", "800m", "1500m", "3000m", "Marathon")
+
+#Mahalanobis distance ( mahdist )
+
+#center the raw data by the means
+resid = sapply(data1[,-1],function(x)x-mean(x)) 
+
+C = cov(data1[,-1])
+mahdist = resid%*%solve(C)%*%t(resid)
+
+mahdist = diag(mahdist)
+names(mahdist) = data1$Country 
+```
+
+Top 5 five countries ranked by Mahalanobis distance (as calculated in Lab1)
+```{r echo=FALSE}
+head(sort(mahdist, decreasing=TRUE),5)
+```
+
+## 1.a. 
+
+Outlier testing with no multiple-testing correction procedure at significance level: 0.1%
+
+From Chi-square we get that the critical value, for $\alpha=0.001$ is 24.32189, so every distance that is greater than this critical value is considered as an outlier.
+
+```{r echo=FALSE}
+alpha <- 0.001
+
+chi_value <- qchisq(1-alpha, df = 7)
+mahdist_outliers <- mahdist[mahdist>chi_value]
+```
+
+
+```{r echo=FALSE}
+sort(mahdist_outliers, decreasing=TRUE)
+```
+
+
+Outlier testing with Bonferroni multiple-testing correction procedure (with alpha = 0.1% / 54)
+
+From Chi-square with Bonferroni correction we get that the critical value, for $\alpha=0.001/54$ is  33.83184 so, again, every distance that is greater than this critical value is considered as an outlier.
+
+```{r echo = FALSE}
+chi_value_bonferroni <- qchisq(1-alpha/length(mahdist), df = 7)
+mahdist_outliers_bonferroni <- mahdist[mahdist>chi_value_bonferroni]
+```
+
+```{r echo=FALSE}
+sort(mahdist_outliers_bonferroni, decreasing=TRUE)
+```
+
+Using 0.1% significance levels and no correction procedure, we define 3 outliers in our dataset (SAM, PNG, KORN).
+Using the Bonferroni multiple-testing correction procedure, we conclude that only 1 observation is an outlier (SAM) based on the Mahalanobis distances.
+
+According to McDonald in Handbook of Biological Statistics, the Bonferroni correction is appropriate when we want to be very careful not to get any false positives during the tests.
+
+(http://www.biostathandbook.com/multiplecomparisons.html)
+
+The correction happens at the expense of finding many false negatives, i.e. not finding outliers which actually are present.
+The Bonferroni approach might be useful in medical problems, but in our case, we believe that it is too conservative when it comes to classifying outliers.
+
+The 0.1% significance level is considered to be low, as most tests are conducted at 5% level. This means that we want to be very certain that the outliers we define actually exist. Setting this level depends highly on the nature of the problem at hand, but in this case we think that a significance level of 5% would be more justifiable. This approach would result in 5 outliers.
+
+
+## 1.b.
+
+KORN seems like an outlier based on Mahalanobis distance, but not on Euclidean. This is because the Mahalanobis distance removes redundant information from correlated variables.
+
+(https://waterprogramming.wordpress.com/2018/07/23/multivariate-distances-mahalanobis-vs-euclidean/)
+
+With Mahalanobis distance we also use the relationships (covariances) between the variables (and not only the marginal variances as Euclidean distance does).
+
+In the case of North Korea, running results were extreme in runtypes which have little correlation to other variables and low where the correlation was large. 
+
+
+\newpage
+
+# Question 2: Test, confidence region and confidence inter- vals for a mean vector.
+
+```{r, echo=FALSE}
+##################--QUESTION 2--##################
+# Importing and modifying data file
+df = read.table("T5-12.dat")
+colnames(df) <- c("Tail.length", "Wing.length")
+```
+
+## 2.a.
+
+The $100(1-\alpha)$% confidence region for ($\mu_1, \mu_2$) of a p-dimensional distribution is the ellipse detemined by all $\boldsymbol{\mu}$ such that:
+$$n(\bar{\boldsymbol{x}}-\boldsymbol{\mu})'\boldsymbol{S}^{-1}(\bar{\boldsymbol{x}}-\boldsymbol{\mu}) \le c^2=\frac{p(n-1)}{(n-p)}F_{p,n-p}(\alpha)$$
+```{r, echo=FALSE}
+# Initial values
+mu <- c(190,275)
+xbar <- as.numeric(colMeans(df))
+p <- 2
+n <- nrow(df)
+alpha <- 0.05
+S <- cov(df)
+```
+
+
+In our case, the 95% confidence ellipse for $\boldsymbol{\mu}$ consists of all values ($\mu_1,\mu_2$) satisfying:
+$$45 \cdot[193.62-\mu_1,279.78-\mu_2] \begin{bmatrix} 0.02 & -0.01 \\ -0.01 & 0.01 \end{bmatrix}  \begin{bmatrix} 193.62-\mu_1 \\ 279.78-\mu_2 \end{bmatrix} \le c^2$$
+where $c^2=\frac{2(45-1)}{45-2} \cdot F_{2,43}(0.05)= 2.047 \cdot 3.215=6.579535$. 
+
+If $(\lambda_i,e_i)$ are the eigenvalue-eigenvector pairs od S, then the i-th axis of the confidence ellipse has half length $\sqrt{p(n-1)\cdot F_{p,n-p}(\alpha)/ (n-p)}\sqrt{\frac{\lambda_i}{n}}$ along the $e_i$ direction.
+
+Then, the axes of the confidence ellipse are:
+
+$$\pm \sqrt{\lambda_i}\sqrt{\frac{p(n-1)}{n(n-p)}\cdot F_{p,n-p}(\alpha)} \cdot\boldsymbol{e}_i=  \pm \sqrt{\lambda_i}\sqrt{c^2}\cdot\boldsymbol{e}_i$$
+When we calculate the values for our data, we obtain the following eigenvalues-eigenvectors: 
+```{r, echo=FALSE}
+# Axes of the confidence ellipse
+c2 <- ((p*(n-1))/(n-p))*qf(1-alpha,df1=p,df2=n-p)
+lambdas <- eigen(S)$values
+e <-eigen(S)$vector
+```
+
+$$\lambda_1=294.60898, \quad e_1'=[0.5754, 0.8179]$$
+$$\lambda_2=34.62637, \quad e_2'=[-0.8179, 0.5754]$$
+So, beginning at the center $\bar{x}'=[193.62, 279.78]$, the axes of the 95% confidence ellipse are:
+
+$$\text{major axis:  } \quad \begin{bmatrix} 0.5753739 \\ 0.8178905 \end{bmatrix}$$
+$$\text{minor axis:  } \quad \begin{bmatrix} -0.8178905 \\ 0.5753739 \end{bmatrix}$$
+And the half length of each axis are:
+
+$$\text{major axis half-length:  } \quad + \sqrt{294.60898}\sqrt{0.1461883}$$
+
+$$\text{minor axis half-length:  } \quad +\sqrt{34.62637}\sqrt{0.1461883}$$
+If we plot these results, we obtain the following graph [^1]
+
+[^1]: Sources: https://stackoverflow.com/questions/41820683/how-to-plot-ellipse-given-a-general-equation-in-r and https://stackoverflow.com/questions/15915625/plotting-an-ellipse-in-matlab-given-in-matrix-form
+
+```{r, echo=FALSE, fig.align='center'}
+#PLOT
+f_value <- qf(1-alpha,df1=p,df2=n-p)
+
+# Points of the ellipse
+theta <- seq(0, 2*pi, length = 1000) 
+r <- sqrt((n-1)*p/(n-p)*f_value/n)
+v <- rbind(r*cos(theta), r*sin(theta))
+z <- backsolve(chol(solve(S)), v)+xbar
+
+# Confidence intervals (rectangle)
+c <- sqrt(c2)
+low1 <- xbar[1] - c*sqrt(S[1,1]/n)
+upp1 <- xbar[1] + c*sqrt(S[1,1]/n)
+low2 <- xbar[2] - c*sqrt(S[2,2]/n)
+upp2 <- xbar[2] + c*sqrt(S[2,2]/n)
+
+# Plot of the ellipse
+{plot(t(z), type="l", xlab="Tail Length", ylab="Wing Length", main="95% confidence ellipse for the population means", col="red")
+text(xbar[1], xbar[2], "Center", cex=0.7, adj = c(1,0))
+points(xbar[1], xbar[2], pch=19,col="red")
+points(mu[1], mu[2], pch=19,col="green")
+text(mu[1], mu[2], "(190,275)", cex=0.75, adj = c(0,1))
+abline(v=low1, col="blue", lty=2)
+abline(v=upp1, col="blue", lty=2)
+abline(h=low2, col="blue", lty=2)
+abline(h=upp2, col="blue", lty=2)
+}
+```
+In the plot we can see the 95% confidence ellipse in red and also the confidence intervals in the dashed rectangle in blue. The green dot represents the population mean values for male hook-billed kites ($\mu'=[190, 275]$). 
+
+As we can observe, the green dot falls inside the ellipse, so we could conclude that these are in fact plausible values for the mean tail length and mean wing length for the female birds. 
+
+Also, we can confirm that  $\mu'=[190, 275]$ is in the confidence region by computing the inequality explained above in this exercise:
+```{r, echo=FALSE}
+right_side<- n*(xbar-mu)%*%solve(S)%*%(xbar-mu)
+result <- right_side <= c2 #TRUE
+```
+$$45 \cdot[193.62-190,279.78-275] \begin{bmatrix} 0.02 & -0.01 \\ -0.01 & 0.01 \end{bmatrix}  \begin{bmatrix} 193.62-190 \\ 279.78-275 \end{bmatrix} \le \frac{2(45-1)}{45-2} \cdot F_{2,45-2}(0.05)$$
+
+$$5.54313 \le 6.578471$$
+
+## 2.b.
+
+### $T^2$ simultaneous confidence intervals:
+
+$$a'\bar{x}-c\sqrt{\frac{a'Sa}{n}} \le a'\mu \le a'\bar{x}+c\sqrt{\frac{a'Sa}{n}}$$
+where $c= \sqrt{\frac{p(n-1)}{(n-p)}F_{p,n-p}(\alpha)}= \sqrt{6.578471}=2.564853$. 
+
+So, the $100(1-\alpha)$% simultaneous 95% $T^2$-intervals are
+
+```{r, echo=FALSE}
+CI1 <- c(low1, upp1)
+CI2 <- c(low2, upp2)
+```
+
+$$\text{For } \mu_1: \quad \bar{x}_1 \pm c \sqrt{\frac{s_{11}}{n}}=193.62 \pm 2.565 \cdot 1.638$$
+
+$$\Rightarrow \quad  \boxed{189.4217 \le \mu_1  \le 197.8227}$$
+
+$$\text{For } \mu_2: \quad \bar{x}_2 \pm c \sqrt{\frac{s_{22}}{n}}=279.78 \pm 2.565 \cdot 2.153$$
+
+$$\Rightarrow \quad \boxed{274.2564 \le \mu_2  \le 285.2992}$$
+
+
+### Bonferroni $100(1-\alpha)$% confidence intervals:
+
+$$\bar{x}_i \pm t_{n-1}\Big(\frac{\alpha}{2m}\Big)\sqrt{\frac{s_{ii}}{n}}, \text{ for } i=1,2, \dots, p $$
+where m is the number of tests being carried out and $t_{n-1}\big(\frac{\alpha}{2p}\big)= t_{44}\big(\frac{0.05}{4}\big)= 2.32$.
+
+So, the 95% Bonferroni intervals for the two population means are:
+
+```{r, echo=FALSE}
+t <- qt(1-alpha/(2*p),df=n-1)
+
+low1 <- xbar[1] - t*sqrt(S[1,1]/n)
+upp1 <- xbar[1] + t*sqrt(S[1,1]/n)
+low2 <- xbar[2] - t*sqrt(S[2,2]/n)
+upp2 <- xbar[2] + t*sqrt(S[2,2]/n)
+
+bonf1 <- c(low1, upp1)
+bonf2 <-c(low2, upp2)
+```
+
+$$\text{For } \mu_1: \quad \bar{x}_1 \pm t_{44}\Big( \frac{0.05}{4} \Big) \sqrt{\frac{s_{11}}{n}}=193.62 \pm 2.3207 \cdot 1.638$$
+
+$$\Rightarrow \quad \boxed{189.8216 \le \mu_1  \le 197.4229}$$
+
+$$\text{For } \mu_2: \quad \bar{x}_2 \pm t_{44}\Big( \frac{0.05}{4} \Big) \sqrt{\frac{s_{22}}{n}}=279.78 \pm 2.3207 \cdot 1.638$$
+
+$$\Rightarrow \quad \boxed{274.7819 \le \mu_2  \le 284.7736}$$
+
+### Comparison and advantage of $T^2$-intervals over Bonferroni.
+
+The simultaneous $T^2$-intervals are a bit wider than the Bonferroni confidence interval in both variables, the Bonferroni interval falls within the $T^2$-interval.
+Bonferroni correction tries to ensure that the probability of declaring even one false positive is no more than, e.g., 5%. 
+The Bonferroni correction declares as significant (rejects the null) any hypothesis where the p-value is  $\le 0.05/2m$.
+
+If we are interested only in the component means, the Bonferroni intervals provide more precise estimates than the $T^2$-intervals.
+
+## 2.c.
+
+We will explore if the data is plausibly coming from a bivariate Normal distribution analyzing Q-Q plots of each variable as well as the scatterplot of the observations and the sample contour:
+
+```{r, fig.align='center', echo=FALSE}
+par(mfrow=c(1,2), mar=c(4,4,1,0)+0.1)
+qqPlot(df$Tail.length,ylab="sample",main = "tail length",envelope=FALSE,
+       col.lines="red",pch=19,id=F)
+
+qqPlot(df$Wing.length,ylab="sample",main = "wing length",envelope=FALSE,
+       col.lines="red",pch=19,id=F)
+```
+
+We could say that the univariate normal distribution is not a viable model for each variable separately.
+
+
+```{r, echo=FALSE, fig.align='center', fig.height=4}
+ggplot(df, aes(x = Tail.length, y = Wing.length)) + 
+  geom_point() +
+  ggtitle("Scatter diagram")+
+  labs(x="tail length (mm)",y="wing length (mm)") +
+  theme(plot.title = element_text(hjust = 0.5)) #adjust the title to the centre
+```
+
+The observations in the scatterplot should be distributed forming an ellipse and, as we can observe, the dots have a wide spread.
+
+```{r, echo=FALSE, fig.align='center' }
+#library(MASS)
+bivn.kde <-  MASS::kde2d(df$Tail.length, df$Wing.length, n = 45)   # from MASS package
+# Contour plot overlayed on heat map image of results
+image(bivn.kde, xlab="tail length (mm)",ylab="wing length (mm)")        # from base graphics package
+contour(bivn.kde, add = TRUE)     # from base graphics package
+```
+
+From the contour plot of the sample, the curves don't have an ellipse shape. 
+
+Summarizing the three graphs, we could say that the bivariate normal distribution is not a viable population model.
+
+\newpage
+
+# Question 3: Comparison of mean vectors (one–way MANOVA)
+
+## 3.a.
+
+First we construct a data frame for the descriptive statistics to obtain a general image of the data.
+```{r}
+##################--QUESTION 3--##################
+statsdf = data.frame(cbind(mean=sapply(data[-1], mean),
+                       median=sapply(data[-1], median),
+                       min=sapply(data[-1], min),
+                       max=sapply(data[-1], max),
+                       range=sapply(data[-1], function(x)max(x)-min(x)),
+                       sd=sapply(data[-1], sd),
+                       skewness=sapply(data[-1], timeDate::skewness),
+                       kurtosis=sapply(data[-1], timeDate::kurtosis)
+                       ))
+
+as.data.frame(t(statsdf))
+#statsdf
+```
+
+*Scatterplot*
+```{r  echo=F}
+#create scatterplots
+plot1 <- ggplot(data = data, 
+        mapping = aes(x = epoch, y = mb)) +
+     ggtitle("Plot of maximum breadth") +
+     geom_point() 
+plot2 <- ggplot(data = data, 
+        mapping = aes(x = epoch, y = bh)) +
+     ggtitle("Plot of basibregmatic height") +
+     geom_point() 
+plot3 <- ggplot(data = data, 
+        mapping = aes(x = epoch, y = bl)) +
+     ggtitle("Plot of basialiveolar length") +
+     geom_point() 
+plot4 <- ggplot(data = data, 
+        mapping = aes(x = epoch, y = nh)) +
+     ggtitle("Plot of nasal height") +
+     geom_point() 
+
+#combine the scatterplots
+grid.arrange(plot1,plot2,plot3,plot4)
+
+```
+
+*Boxplot*
+```{r  echo=F}
+boxplot1 <- ggplot(data = data, mapping = aes(x = epoch, y = mb)) +
+    ggtitle("Boxplot of maximum breadth") +
+    geom_boxplot()
+
+boxplot2 <- ggplot(data = data, mapping = aes(x = epoch, y = bh)) +
+    ggtitle("Boxplot of basibregmatic height") +
+    geom_boxplot()
+
+boxplot3 <- ggplot(data = data, mapping = aes(x = epoch, y = bl)) +
+    ggtitle("Boxplot of basialiveolar length") +
+    geom_boxplot()
+
+boxplot4 <- ggplot(data = data, mapping = aes(x = epoch, y = nh)) +
+    ggtitle("Boxplot of nasal height") +
+    geom_boxplot()
+
+grid.arrange(boxplot1,boxplot2,boxplot3,boxplot4)
+
+```
+We use boxplots to examine our data. We can observe an outlier for maximum breadth during the c3300BC period, 2 outliers for Basibregmatic height during the C4000BC epoch and one during the c200BC epoch. 
+About basialiveolar length, we observe an outlier during the cAD150 epoch.
+Finally, for nasal heigh there are two outliers, one during c1850BC and one during c200BC epochs.
+
+Looking at the boxplot, we get a general image about the standard deviation which is indicated by the size of the boxplot, so for example we can see that the standard deviation of basibregmatic height during cAD150 epoch is quite big.
+
+Also we can observe that in many cases the data are not symmetric, and this can be seen from the median which is the black line inside the boxplot.
+When the line is below the center then the population is skewed to the right, whereas when the line is above the center the population is skewed to the left.
+
+## 3.b.
+Here is the data frame with the means of each variable in each epoch.
+```{r  echo=F}
+c4000BC_mean <- sapply(data[1:30,2:5], mean)
+
+c3300BC_mean <- sapply(data[31:60,2:5],mean)
+    
+c1850BC_mean <- sapply(data[61:90,2:5], mean) 
+
+c200BC_mean <- sapply(data[91:120,2:5],mean)
+
+cAD150_mean <- sapply(data[121:150,2:5],mean)
+
+means <- as.data.frame(rbind(c4000BC_mean,c3300BC_mean,c1850BC_mean,c200BC_mean,cAD150_mean))
+means
+```
+Looking at the data frame we see for the maximum breadth that the mean was increasing slowly but steadily through the epochs.
+For basibregmatic height we can't say that there are significant changes but it seams as the mean was decreasing through the epochs, except in c1850BC when there was an increase.
+Basialiveolar length was the characteristic that its mean changed the most. There was a quite significant decrease of the mean, compared at least to the other characteristics.
+Finally, nasal height's mean remained almost stable.
+
+Above, we plot the means to obtain a better image of the changes.
+
+```{r echo=F}
+#library(ggpubr)
+#plots for mean
+#ggerrorplot(data, x = "epoch", y = c("mb","bh"), 
+            #desc_stat = "mean_sd", color = "black",
+            #add = "dotplot", add.params = list(color = "darkgray")
+            #)
+
+mplot1 <- ggplot(data, aes(x=epoch, y=mb)) + geom_point() +
+  stat_summary(aes(y = mb,group=1), fun.y=mean, colour="red", geom="line",group=1) 
+
+mplot2 <- ggplot(data, aes(x=epoch, y=bh)) + geom_point() +
+  stat_summary(aes(y = bh,group=1), fun.y=mean, colour="red", geom="line",group=1) 
+
+mplot3 <- ggplot(data, aes(x=epoch, y=bl)) + geom_point() +
+  stat_summary(aes(y = bl,group=1), fun.y=mean, colour="red", geom="line",group=1) 
+
+mplot4 <- ggplot(data, aes(x=epoch, y=nh)) + geom_point() +
+  stat_summary(aes(y = nh,group=1), fun.y=mean, colour="red", geom="line",group=1) 
+
+grid.arrange(mplot1,mplot2,mplot3,mplot4,top = textGrob("Plot of Means",gp=gpar(fontsize=18,font=3)))
+
+```
+
+Now we can observe better the differences of means between the epochs, so we will continue by computing and reporting simultaneous confidence intervals.
+
+## 3.c.
+
+##Bonferroni simultaneous confidenc intervals
+
+```{r  echo=F}
+n <- nrow(data)
+p <- 4
+alpha <- 0.05
+xbar <- as.numeric(colMeans(data[-1]))
+S <- cov(data[-1])
+
+
+#intervals lengths
+t <- qt(1-alpha/(2 * p),df=n - 1)
+
+#upper and lower bounds
+bon.upper1 <- xbar[1] + t*sqrt(S[1,1]/n)
+bon.lower1 <- xbar[1] - t*sqrt(S[1,1]/n)
+
+bon.upper2 <- xbar[2] + t*sqrt(S[2,2]/n)
+bon.lower2 <- xbar[2] - t*sqrt(S[2,2]/n)
+
+bon.lower3 <- xbar[3] - t*sqrt(S[3,3]/n)
+bon.lower3 <- xbar[3] - t*sqrt(S[3,3]/n)
+
+bon.upper4 <- xbar[4] + t*sqrt(S[4,4]/n)
+bon.lower4 <- xbar[4] - t*sqrt(S[4,4]/n)
+
+#plot the intervals
+mplot1_int <- ggplot(data, aes(x=epoch, y=mb)) + 
+  geom_point() +
+  stat_summary(aes(y = mb,group=1), fun.y=mean, colour="red", geom="line",group=1) +
+  geom_line(aes(x=epoch, y=bon.upper1), colour='blue', linetype='dashed', size=1) + 
+    geom_line(aes(x=epoch, y=bon.lower1), colour='blue', linetype='dashed', size=1) +
+    labs(title='Bonferroni Simultaneous Confidence Intervals')
+
+mplot1_int
+```
+
+MANOVA (multivariate analysis of variance) is a type of multivariate analysis used to analyze data that involves more than one dependent variable at a time. MANOVA allows us to test hypotheses regarding the effect of one or more independent variables on two or more dependent variables.
+
+```{r}
+library(MVN)
+library(biotools)
+#https://rdrr.io/cran/micompr/man/assumptions_manova.html
+
+#Check Manova assumptions
+
+y <- cbind(data$mb,data$bh,data$bl,data$nh)
+#normality
+normality <- mvn(y)
+normality
+
+#multicollinearity
+cor_mat <- cor(data[-1])
+
+#Homogeneity of Variance
+bar_test1 <-  bartlett.test(mb~ epoch, data)
+bar_test2 <-  bartlett.test(bh~ epoch, data)
+bar_test3 <-  bartlett.test(bl~ epoch, data)
+bar_test4 <-  bartlett.test(nh~ epoch, data)
+
+
+#Manova
+sk.mod <- lm(cbind(mb,bh,bl,nh) ~ epoch, data)
+fit <- sk.mod$fitted.values
+manova_res <- manova(sk.mod, test = "Hotell")
+
+summary(manova_res)
+
+#after seeing that Ho has been rejected we use aov to do testing in individual responses
+summary(aov(sk.mod))
+
+#Residuals
+mean(manova_res$residuals)
+
+hist(manova_res$residuals, main = "Histogram of residuals",xlab = "Residuals")
+
+#confirm normality with shapiro wilk
+shap_test <- shapiro.test(manova_res$residuals)
+shap_test                       
+```
+
+#Assumptions of MANOVA
+
+*Normality* 
+Using function mvn we check the Normality and in our case our variables are normally distributed.
+
+*Absence of multicollinearity* 
+Looking at the correlation matrix we see that there are no significance correlations between the variables. To the contrary, all the correlations between the variables are weak. 
+
+*Homogeneity of Variance*
+Manova assumes that variances are equal across groups. For this, we use Bartlett's test to examine if this is true in our case and base on the p-values that we get, which are all >0.5 we verify that all our dependent variable have equal variances through the epochs.
+
+#Analysis of MANOVA
+
+We want to check if the means differ between the epochs. Thus, first we use the function manova and looking at the results we get p-value = 4.675e-06 < 0.05 , which means that we reject the null Hypothesis and we conclude that there are significant differences between the means. However, we don't know in which variables those differences occur. 
+For this reason we use aov() to test each one variable seperately.
+As we see from the results, only nasal height's p-value is greater than 0.5 (p-value= 0.2032) and all the other variables have significance differences in their means between the epochs.
+However, that was expected as we have already came to this conclusion from question (b) where we saw that nasal height's mean was the only one to remain roughly stable.
+
+# Appendix

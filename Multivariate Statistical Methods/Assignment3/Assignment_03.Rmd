@@ -1,0 +1,183 @@
+---
+title: "Assignment 3: Principle component and factor analysis"
+subtitle:  "Group 12"
+author: "Dávid Hrabovszki (davhr856), Laura Julia Melis (lauju103), Spyridon Dimitriadis (spydi472), Vasileia Kampouraki (vaska979)"
+date: "08/12/2019"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F, error = F)
+```
+
+```{r, echo=FALSE}
+# NEEDED LIBRARIES
+library(ggplot2)
+library(tidyr)
+library(gridExtra)
+library(car)
+library(heplots)
+library(MASS)
+library(fmsb)
+
+RNGversion('3.5.1')
+```
+
+
+# Question 1: Principal components, including interpretation of them.
+
+```{r, echo=FALSE}
+##################--QUESTION 1--##################
+# Importing and modifying data file
+df = read.table("T1-9.dat")
+colnames(df) = c("country","100m", "200m", "400m", "800m", "1500m", "3000m" , "marathon")
+df1 = df[,-1]  # without the column of the countries
+```
+
+## 1.a. 
+The sample correlation matrix ($R$) is:
+```{r, echo=FALSE}
+# A1. Sample correlation matrix:
+R <- cor(df1)
+round(R, 5)
+```
+
+The eigenvalues of $R$ are:
+```{r, echo=FALSE}
+# A2. Eigenvalues and eigenvectors:
+eigen_decomposition <- eigen(R)
+
+eigenval <- t(as.matrix(eigen_decomposition$values))
+colnames(eigenval) <- colnames(df1)
+rownames(eigenval) <- "Eigenvalue"
+round(eigenval,5)
+```
+
+And its eigenvectors:
+```{r, echo=FALSE}
+eigenvector <- as.data.frame(eigen_decomposition$vector)
+colnames(eigenvector) <- c("e1","e2","e3","e4","e5","e6","e7")
+round(eigenvector,5)
+```
+
+## 1.b. 
+
+### First two principal components
+In general, the i-th principal component is given by
+
+$$\hat{y}_i=\hat{e}'_iz=\hat{e}'_{i1}z_1 + \hat{e}'_{i2}z_2 + \dots + \hat{e}'_{ip}z_p \quad i=1, 2, \dots, p.$$
+where $z_i$ are the standardized variables.
+
+So given the eigenvectors $e_1$ and $e_2$ obtained in part (a), the first two principal components for the standardized variables are: 
+
+$$\hat{y}_1=\hat{e}'_1z=-0.37777z_1-0.38321z_2-0.36804z_3-0.39478z_4-0.38926z_5-0.37609z_6-0.35520z_7.$$
+$$\hat{y}_2=\hat{e}'_2z=-0.40718z_1- 0.41363z_2- 0.45935z_3+0.16125 z_4+ 0.30909z_5+ 0.42319z_6+0.38922	z_7.$$
+
+### Correlations of the standardized variables with the components
+
+The correlation coefficients between the components $Y_i$ and the standarized variables $z_i$ are given by
+
+$$r_{\hat{y}_i,z_k}= \frac{\hat{e}_{ik}\sqrt{\hat{\lambda}_i}}{\sqrt{s_{kk}}}, \quad i,k=1,2,\dots,p$$
+
+In these data we have the following coefficients:
+```{r, echo=FALSE}
+# B.2. The correlation coefficients between Y and z. 
+S <- cov(df1)
+r <- matrix(0, nrow=2, ncol=ncol(df1))
+for(i in 1:2){
+  for(k in 1:ncol(df1)){
+    r[i,k] <- (eigenvector[i,k]*sqrt(eigenval[i]))/sqrt(S[k,k])
+  }
+}
+colnames(r) <- colnames(df1)
+rownames(r) <- c("r_Y1", "r_Y2")
+round(r, 5)
+```
+
+### Cumulative percentage of the total (standardized) sample variance.
+
+The percentage of the total sample variance due to the k-th principal component is given by
+
+$$\Bigg(\frac{\hat{\lambda}_k}{\hat{\lambda}_1+\hat{\lambda}_2+ \dots + \hat{\lambda}_p}\Bigg)\cdot 100\%, \quad k=1,2, \dots, p$$
+
+So, the total sample variance in the first two components are: 
+```{r, echo=FALSE}
+# B.3. Cumulative percentage of the total sample variance.
+percentage <- vector()
+cumulative <- vector()
+for(i in 1:2){
+  percentage[i] <- (eigenval[i]/ sum(eigenval))*100
+  cumulative[i] <- sum(percentage)
+}
+
+total_var <- rbind(percentage, cumulative)
+colnames(total_var) <- c("PC1", "PC2")
+total_var
+```
+
+The percentage of the total standarized sample variance explained by the first two principal components is 91.95%. Then, as the majority of the total sample variance is attributed to these first two components, and in our case, if we remove the other variables, we won't lose much information. 
+
+
+
+## 1.c. 
+The projections in PC1 are more or less the same (around 0.3) which means that all the variables contribute almost the same. So, PC1 might measure the athletic excellence of a given nation because all the variables contribute the same. 
+
+Regarding the projections in PC2, the first three elements (100m, 200m and 400m) of the PC2 have the smallest values, so they contribute more to the second principal component. Because of this, we can interpret it as it captures how a nation performes in short distance runtypes.
+
+## 1.d. 
+In order to rank the countries based on the first principal component ($\hat{y}_1$) first we need the standarize our observations: 
+
+$$z_{ij}=\frac{x_{ij}-\bar{x}_j}{\sqrt{s_{jj}}} \quad i=1,2,\dots, n\quad j=1,2,\dots, p$$
+And then, we only have to compute the following formula, replacing the $z_j$ values with the standarized observations:
+
+$$\hat{y}_1=\hat{e}'_1z=-0.37777z_1-0.38321z_2-0.36804z_3-0.39478z_4-0.38926z_5-0.37609z_6-0.35520z_7.$$.
+
+As a result, the 5 contries with highest scores are: 
+
+```{r, echo=FALSE}
+# B.5. Ranking of nations based on the PC1 score.
+# First we need to standarize the observations.
+df1 <- scale(df1)
+
+# Now we can calculate the scores.
+ranking <- matrix(0,nrow=nrow(df1), ncol=1)
+for(i in 1:nrow(df1)){
+  ranking[i,1] <- sum(eigenvector[,1]* df1[i,])
+}
+
+names(ranking) = df$country 
+head(sort(ranking, decreasing=TRUE),5)
+```
+
+This ranking corresponds with the group of countries that perform better in all runtypes. 
+
+```{r, echo=FALSE, fig.align='center'}
+plot(sort(ranking, decreasing=TRUE), jitter(rep(0, length(ranking)),0.2) , pch=" ", xlab="Scores of PC1", ylab="Jitter")
+text(sort(ranking, decreasing=TRUE),  jitter(rep(0, length(ranking)),0.2), labels = names(sort(ranking, decreasing=TRUE)), cex=0.8)
+```
+
+NOTE: In the above plot the x-axis represent the scores of the PC1 and the y-axis is just the jitter of this points. 
+
+
+\newpage
+
+# Question 2: Factor analysis.
+
+**Solve Exercise 9.28 of Johnson, Wichern, the same data as above. Try both PC and ML as estimation methods. Notice that R’s factanal() only does ML estimation. For the PC method you can use the principal() function of the psych package. What does it mean that the parameter rotation of factanal() is set to "varimax" by default (equivalently rotate of principal())? Do not forget to check the adequacy of your model**
+
+**Tip: Read section “A Large Sample Test for the Number of Common Factors”.**
+
+**EXERCISE: Perform a factor analysis of the national track records for women given in Table 1.9. Use the sample covariance matrix S and interpret the factors. Compute factor scores, and check for outliers in the data. Repeat the analysis with the sample correlation matrix R. Does it make a difference if R, rather than S, is factored? Explain.**
+
+* Covariance matrix:
+```{r, echo=FALSE}
+df1 = df[,-1] 
+S <- cov(df1)
+S
+
+fit <- principal(df1, nfactors = 2, rotate = "varimax", covar=T)
+fit
+```
+
+
+# Appendix

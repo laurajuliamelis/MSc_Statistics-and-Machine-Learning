@@ -1,0 +1,55 @@
+---
+title: "Lab 4 multistats"
+author: "Vasileia Kampouraki (vaska979)"
+date: "12/12/2019"
+output: pdf_document
+---
+
+```{r}
+data <- read.table("C:/Users/Vaso/Desktop/assignments R/P10-16.DAT")
+```
+
+```{r}
+S11 <- as.matrix(data[1:3,1:3])
+S22 <- as.matrix(data[4:5,4:5])
+S12 <- as.matrix(data[1:3,4:5])
+S21 <- as.matrix(t(S12))
+
+#p=3,q=2 
+S11eig <- eigen(S11, symmetric=TRUE)
+S11sqrt <- S11eig$vectors %*% diag(1/sqrt(S11eig$values)) %*% t(S11eig$vectors)
+S22eig <- eigen(S22, symmetric=TRUE)
+S22sqrt <- S22eig$vectors %*% diag(1/sqrt(S22eig$values)) %*% t(S22eig$vectors)
+Xmat <- S11sqrt %*% S12 %*% solve(S22) %*% S21 %*% S11sqrt
+Ymat <- S22sqrt %*% S21 %*% solve(S11) %*% S12 %*% S22sqrt
+Xeig <- eigen(Xmat, symmetric=TRUE) 
+Yeig <- eigen(Ymat, symmetric=TRUE) 
+
+#The two canonical correlations
+r <- sqrt(Yeig$values)
+#or r <- sqrt(Xeig$values[1:2])
+
+```
+
+There are k=min(p,q)=min(3,2)= 2 canonical correlations.
+
+```{r}
+c <- -42*log(1-r[1]^2)*(1-r[2]^2)
+chisq <- qchisq(0.95,df=6)
+```
+
+c= 12.88 > 12.59 thus we reject the null hypothesis. Not all canonical correlations are zero. There are associations between the groups of variables.
+
+### 2)
+
+Check if r1 is non-zero
+```{r}
+newc <- -43*log(1-r[1]^2)
+newchisq <- qchisq(0.95,df=2)
+```
+
+13.39 > 5.99.We reject the null hypothesis. This suggests that only the first pair of canonical variables is significant.
+
+
+### 3)
+pg548

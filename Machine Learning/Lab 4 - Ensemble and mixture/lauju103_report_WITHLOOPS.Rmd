@@ -1,0 +1,337 @@
+---
+title: "Computer lab 1 block 2"
+author: "Laura Julià Melis"
+date: "12/04/2019"
+output: 
+    pdf_document:
+      toc: true
+---
+
+# Assignment 1. Ensemble Methods. 
+
+**Your task is to evaluate the performance of Adaboost classification trees and random forests on the spam data. Specifically, provide a plot showing the error rates when the number of trees considered are $10, 20, . . . , 100$. To estimate the error rates, use 2/3 of the data for training and 1/3 as hold-out test data. To learn Adaboost classification trees, use the function blackboost() of the R package mboost. Specify the loss function corresponding to Adaboost with the parameter family. To learn random forests, use the function randomForest of the R package randomForest.**
+
+Before starting, it is necessary to load the `mboost` and `randomForest` packages, import the file to R and then split the dataset into training and hold-out sets. See *Appendix* to see the code used.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Changing the version:
+RNGversion('3.5.1')
+
+# Loading the packages
+library(mboost)
+library(randomForest)
+library(ggplot2)
+
+# Importing the data:
+sp <- read.csv2("spambase.csv")
+sp$Spam <- as.factor(sp$Spam)
+
+# Spliting the data in training and hold-out datasets:
+n=dim(sp)[1]
+set.seed(12345)
+id=sample(1:n, floor(n*(2/3)))
+train=sp[id,]
+holdout=sp[-id,]
+```
+
+## 1.1. Adaboost classification tree.
+
+To fit an Adaboost classification tree the function `blackboost()` from the **mboost** package has ben used. Also, the `family` argument has been used to specify the desired loss function which, in our case, has been the `AdaExp()` because we want the function to perform the AdaBoost algorithm and for that, the exponential loss function is needed. Finally, with the `control` argument, it has been indicated the number of trees to be considered ($10, 20, . . . , 100$). 
+
+Once the model has been fitted, predictions and error rates for the hold-out and the training data sets have been calculated.
+```{r, echo=FALSE}
+# Number of trees to consider.
+ntrees <- seq(10, 100, by = 10)
+
+rate_ada_holdout <- vector()
+rate_ada_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_ada <- blackboost(Spam~., data = train, family = AdaExp(), control=boost_control(mstop = i)) 
+          # "AdaExp() uses the exponential loss, which essentially leads to the AdaBoost algorithm"
+          # "mstop = an integer giving the number of initial boosting iterations."
+  
+  # Predictions
+  fitted_ada_holdout <- predict(fit_ada, newdata = holdout, type = c("class"))
+  fitted_ada_train <- predict(fit_ada, newdata = train, type = c("class"))
+  
+  # Error rates
+  rate_ada_holdout[(i/10)] <- round(mean(fitted_ada_holdout != holdout$Spam),4)
+  rate_ada_train[(i/10)] <- round(mean(fitted_ada_train != train$Spam),4)
+}
+```
+
+## 1.2. Random forest model. 
+
+In this section, the `randomForest()` from the **randomForest** package has been used to fit the Random forest models, specifying with the `ntrees` argument that the number of trees to grow in each case are $10, 20, . . . , 100$. 
+
+Then, for each fitted model, predictions and misclassification rates have been calculated.
+```{r, echo=FALSE}
+rate_randomforest_holdout <- vector()
+rate_randomforest_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_randomforest <- randomForest(Spam~., data = train, ntrees=i) #ntree="Number of trees to grow."
+
+  # Predictions
+  fitted_randomforest_holdout <- predict(fit_randomforest, newdata = holdout, type = c("class"))
+  fitted_randomforest_train <- predict(fit_randomforest, newdata = train, type = c("class"))
+
+  # Error rates
+  rate_randomforest_holdout[(i/10)] <- round(mean(fitted_randomforest_holdout != holdout$Spam),4)
+  rate_randomforest_train[(i/10)] <- round(mean(fitted_randomforest_train != train$Spam),4)
+}
+```
+
+## 1.3. Performance evaluation.
+
+* Error rates for the Adaboost model:
+```{r, echo=FALSE}
+# Table with results.
+# Adaboost model:
+as.data.frame(cbind(ntrees, rate_ada_holdout, rate_ada_train))
+```
+
+* Error rates for the Random Forest model:
+```{r, echo=FALSE}
+# Random forest model:
+as.data.frame(cbind(ntrees, rate_randomforest_holdout, rate_randomforest_train))
+```
+
+* Plot showing the error rates by model.
+```{r, echo=FALSE, fig.align='center', fig.height=4}
+# Dataframe to use ggplot()
+df <- data.frame(ntrees, error_rates= c(rate_ada_holdout, rate_ada_train, rate_randomforest_holdout, rate_randomforest_train), dataset  = rep(c("Hold-out", "Train", "Hold-out", "Train"), each=10), model = rep(c("Adaboost", "Adaboost",  "Random Forest", "Random Forest"), each=10))
+
+# Plot of error_rates vs ntrees:
+ggplot(df, aes(x = ntrees, y = error_rates, group = dataset, color = dataset)) + geom_line() + ggtitle("Plot of error rates vs number of trees") + xlab("Number of trees") + ylab("Error rate") + theme_light() + facet_grid(cols = vars(model))
+```
+
+    *ADD COMMENTS ABOUT THE TABLES AND THE GRAPH!
+
+# Assignment 2. Mixture models. 
+**Your task is to implement the EM algorithm for mixtures of multivariate Benoulli distributions. Please use the template in the next page to solve the assignment. Then, use your implementation to show what happens when your mixture models has too few and too many components, i.e. set $K = 2, 3, 4$ and compare results. Please provide a short explanation as well.**
+
+Source: pages 444-447 (Section 9.3.3 "Mixtures of Bernoulli distributions") from the "Pattern Recognition and Machine Learning" of Christopher M. Bishop
+
+The mixture model of multivariate Bernoulli distribution is
+
+$$p(\boldsymbol{x}|\boldsymbol{\mu}, \boldsymbol{\pi})=\sum_{k=1}^K\pi_k p(\boldsymbol{x}|\boldsymbol{\mu}_k) \text{  where } p(\boldsymbol{x}|\boldsymbol{\mu}_k)=\prod_{d=1}^D\mu_{kd}^{x_d}(1-\mu_{kd})^{(1-x_d)}$$
+where:
+
+  - $\boldsymbol{x}=(x_1,x_2, \cdots,x_D)^T$ is the set of $D$ binary variables, each of wich follows a Bernoulli distribution. 
+  - $\pi$ are the mixing coefficients. ($0 \le\pi_k \le 1$)
+  - $\mu$ are the Bernoulli parameters indicating probabiliti of success.
+  
+Our goal is to find maximum likelihood estimates for the parameters in the mixture model above, and in order to achieve that, the expectation–maximization (EM) algorithm will be implemented.
+
+The log-likelihood function for a sample of size N is: 
+
+$$\ln p(\{\boldsymbol{x}_n,\boldsymbol{z}_n\}|\mu,\pi)=\sum_{n=1}^N\sum_{k=1}^K z_{nk} \Bigg[ \ln\pi_k +\sum_{d=1}^D[x_{nd}\ln\mu_{kd}+(1-x_{nd})\ln(1-\mu_{kd})]\Bigg]$$
+where:
+
+  - $\boldsymbol{z}=(z_1,z_2, \cdots,z_K)^T$ is the latent variable: a K-dimensional binary variable.
+  - $k$ is the element of $\boldsymbol{z}$ that equals 1.
+  
+The Expectation-Maximization Algorithm has different steps:
+
+1. Set $\boldsymbol{\pi}$ and $\boldsymbol{\mu}$ to some initial values.
+
+2. *E step*: Compute $p(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})$ for each point. Main idea: "Does this point $x_i$ looks like it came from that initial values distribution?"
+    
+    2.1. This is made using the Bayes's rule: $p(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})=\frac{p(z_{nk},\boldsymbol{x}_n|\boldsymbol{\mu},\boldsymbol{\pi})}{\sum_kp(z_{nk},\boldsymbol{x}_n|\boldsymbol{\mu},\boldsymbol{\pi})}$.
+   
+    2.2. Compute the ML estimation:
+    
+$$\ln p(\boldsymbol{X}|\boldsymbol{\mu},\boldsymbol{\pi})=\sum_{n=1}^N \ln \Bigg[\sum_{k=1}^K \pi_k p(\boldsymbol{x}_n|\boldsymbol{\mu}_k)\Bigg] $$
+    
+
+3. *M step*: Adjust $\pi$ and $\mu$ to fit points assigned to them:
+    
+    3.1. Set $\pi_k$ to $\pi_k^{ML}=\frac{\sum_n^N(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})}{N}$.
+   
+    3.2. Set $\mu_{ki}$ to $\mu_{ki}^{ML}=\frac{\sum_n^N x_{nd}(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})}{\sum_n(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})}$.
+  
+4. Iterate until it converges (repeat until $\boldsymbol{\pi}$ and $\boldsymbol{\mu}$ don't change).
+```{r, eval=FALSE}
+# THIS CASE IS FOR K=3
+### STEP 0. INITIALIZATING THE DATA 
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+plot(true_mu[1,], type="o", col="blue", ylim=c(0,1))+points(true_mu[2,], type="o", col="red")+points(true_mu[3,], type="o", col="green")
+
+# 0.1. Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+K=3 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+### STEP 1. Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it){
+  plot(mu[1,], type="o", col="blue", ylim=c(0,1))+points(mu[2,], type="o", col="red")+ points(mu[3,], type="o", col="green")
+  Sys.sleep(0.5)
+  
+  ###  STEP 2. E-step: Computation of the fractional component assignments
+   # 2.1. We have to compute bayes rule: p(z,x|mu,pi)/ sum(p(z,x|mu,pi))
+        prob_x1 <-  matrix(NA, ncol=K, nrow=N)
+          for(n in 1:N){
+            for(k in 1:K){
+                prob_x1[n,k] <- prod((mu[k,]^x[n,])*(1-mu[k,])^(1-x[n,])) # p(x|mu) -> sum_k(pi_k*bernoulli_dk)
+            }
+          }
+  
+   # 2.2. Log likelihood computation. sum_N ln(sum_K pi * bernoulli)
+          px <-  vector(length=3)
+          logarithm <- 0
+          for(n in 1:N){
+            for(k in 1:K){
+              for(d in 1:D){
+                px[k] <- pi[k] * ((mu[k,d]^x[n,d])*(1-mu[k,d])^(1-x[n,d]))
+                logarithm <- logarithm + log(sum(px[k]))
+              }
+            }
+            llik[it] <- llik[it] + logarithm
+          }
+  
+  cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+  flush.console()
+  
+    # 2.2.1. Stop if the lok likelihood has not changed significantly
+        change <- abs(llik[it] - llik[it-1])
+        if(change < min_change){break}
+  
+  ###  STEP 3. M-step: ML parameter estimation from the data and fractional component assignments
+     # 3.1 Setting new mu. mu_ML= sum_kn(x*z)/sum_k(z)
+        num <- rep(0,D)
+        for(k in 1:K){
+          denom <- sum(z[,k])
+          
+          for(n in 1:N){
+            num <- num + (x[n,]*z[n,k])
+          }
+          mu[k, ]<- num/denom
+        }
+        
+     # 3.2. Setting new pi: pi_ML= sum_k(z)/N (of all n)
+        for(k in 1:K){
+            pi[k] <- sum(z[,k])/N
+        }
+}
+pi
+mu
+plot(llik[1:it], type="o")
+```
+
+# Appendix. 
+
+## Assignment 1. Ensemble Methods. 
+
+**1.0. Initialization.**
+```{r, eval=FALSE}
+# Changing the version:
+RNGversion('3.5.1')
+
+# Loading the packages
+library(mboost)
+library(randomForest)
+
+# Importing the data:
+sp <- read.csv2("spambase.csv")
+sp$Spam <- as.factor(sp$Spam)
+
+# Spliting the data in training and hold-out datasets:
+n=dim(sp)[1]
+set.seed(12345)
+id=sample(1:n, floor(n*(2/3)))
+train=sp[id,]
+holdout=sp[-id,]
+```
+
+**1.1. Adaboost classification tree.**
+```{r, eval=FALSE}
+# Number of trees to consider.
+ntrees <- seq(from=10, to=100, by=10)
+
+rate_ada_holdout <- vector()
+rate_ada_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_ada <- blackboost(Spam~., data = train, family = AdaExp(), control=boost_control(mstop = i)) 
+          # "AdaExp() uses the exponential loss, which essentially leads to the AdaBoost algorithm"
+          # "mstop = an integer giving the number of initial boosting iterations."
+  
+  # Predictions
+  fitted_ada_holdout <- predict(fit_ada, newdata = holdout, type = c("class"))
+  fitted_ada_train <- predict(fit_ada, newdata = train, type = c("class"))
+  
+  # Error rates
+  rate_ada_holdout[(i/10)] <- round(mean(fitted_ada_holdout != holdout$Spam),4)
+  rate_ada_train[(i/10)] <- round(mean(fitted_ada_train != train$Spam),4)
+}
+```
+
+**1.2. Random forest model.**
+```{r, eval=FALSE}
+rate_randomforest_holdout <- vector()
+rate_randomforest_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_randomforest <- randomForest(Spam~., data = train, ntrees=i) #ntree="Number of trees to grow."
+
+  # Predictions
+  fitted_randomforest_holdout <- predict(fit_randomforest, newdata = holdout, type = c("class"))
+  fitted_randomforest_train <- predict(fit_randomforest, newdata = train, type = c("class"))
+
+  # Error rates
+  rate_randomforest_holdout[(i/10)] <- round(mean(fitted_randomforest_holdout != holdout$Spam),4)
+  rate_randomforest_train[(i/10)] <- round(mean(fitted_randomforest_train != train$Spam),4)
+}
+```
+
+**1.3. Performance evaluation.**
+```{r, eval=FALSE}
+# Table with results.
+# Adaboost model:
+as.data.frame(cbind(ntrees, rate_ada_holdout, rate_ada_train))
+
+# Random forest model:
+as.data.frame(cbind(ntrees, rate_randomforest_holdout, rate_randomforest_train))
+
+# Dataframe to use ggplot()
+df <- data.frame(ntrees, error_rates= c(rate_ada_holdout, rate_ada_train, 
+                                        rate_randomforest_holdout, rate_randomforest_train),
+                 dataset  = rep(c("Test", "Train", "Test", "Train"), each=10), 
+                 model = rep(c("Adaboost", "Adaboost",  "Random Forest", "Random Forest"), each=10))
+
+# Plot of error_rates vs ntrees:
+ggplot(df, aes(x = ntrees, y = error_rates, group = dataset, color = dataset)) 
++ geom_line() + ggtitle("Error rates vs number of trees") 
++ xlab("Number of trees") + ylab("Error rate") + theme_light() 
++ facet_grid(cols = vars(model))
+```
+
+## Assignment 2. Mixture models. 

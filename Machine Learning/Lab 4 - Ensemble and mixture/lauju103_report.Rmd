@@ -1,0 +1,889 @@
+---
+title: "Computer lab 1 block 2"
+author: "Laura Julià Melis"
+date: "12/03/2019"
+output: 
+    pdf_document:
+      toc: true
+      toc_depth: 4
+---
+
+# Assignment 1. Ensemble Methods. 
+
+Before starting, it is necessary to load the `mboost` and `randomForest` packages, import the file to R and then split the dataset into training and hold-out sets. See *Appendix* to see the code used.
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# Changing the version:
+RNGversion('3.5.1')
+
+# Loading the packages
+library(mboost)
+library(randomForest)
+library(ggplot2)
+
+# Importing the data:
+sp <- read.csv2("spambase.csv")
+sp$Spam <- as.factor(sp$Spam)
+
+# Spliting the data in training and hold-out datasets:
+n=dim(sp)[1]
+set.seed(12345)
+id=sample(1:n, floor(n*(2/3)))
+train=sp[id,]
+holdout=sp[-id,]
+```
+
+## 1.1. Adaboost classification tree.
+
+To fit an Adaboost classification tree the function `blackboost()` from the **mboost** package has ben used. Also, the `family` argument has been used to specify the desired loss function which, in our case, has been the `AdaExp()` because we want the function to perform the AdaBoost algorithm and for that, the exponential loss function is needed. Finally, with the `control` argument, it has been indicated the number of trees to be considered ($10, 20, . . . , 100$). 
+
+Once the model has been fitted, predictions and error rates for the hold-out and the training data sets have been calculated.
+```{r, echo=FALSE}
+# Number of trees to consider.
+ntrees <- seq(10, 100, by = 10)
+
+rate_ada_holdout <- vector()
+rate_ada_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_ada <- blackboost(Spam~., data = train, family = AdaExp(), control=boost_control(mstop = i)) 
+          # "AdaExp() uses the exponential loss, which essentially leads to the AdaBoost algorithm"
+          # "mstop = an integer giving the number of initial boosting iterations."
+  
+  # Predictions
+  fitted_ada_holdout <- predict(fit_ada, newdata = holdout, type = "class")
+  fitted_ada_train <- predict(fit_ada, newdata = train, type = "class")
+  
+  # Error rates
+  rate_ada_holdout[(i/10)] <- mean(fitted_ada_holdout != holdout$Spam)
+  rate_ada_train[(i/10)] <- mean(fitted_ada_train != train$Spam)
+}
+```
+
+## 1.2. Random forest model. 
+
+In this section, the `randomForest()` from the **randomForest** package has been used to fit the Random forest models, specifying with the `ntrees` argument that the number of trees to grow in each case are $10, 20, . . . , 100$. 
+
+Then, for each fitted model, predictions and misclassification rates have been calculated.
+```{r, echo=FALSE}
+rate_randomforest_holdout <- vector()
+rate_randomforest_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_randomforest <- randomForest(Spam~., data = train, ntree=i) #ntree="Number of trees to grow."
+
+  # Predictions
+  fitted_randomforest_holdout <- predict(fit_randomforest, newdata = holdout, type = "class")
+  fitted_randomforest_train <- predict(fit_randomforest, newdata = train, type = "class")
+
+  # Error rates
+  rate_randomforest_holdout[(i/10)] <- mean(fitted_randomforest_holdout != holdout$Spam)
+  rate_randomforest_train[(i/10)] <- mean(fitted_randomforest_train != train$Spam)
+}
+```
+
+## 1.3. Performance evaluation.
+
+* Error rates for the Adaboost model:
+```{r, echo=FALSE}
+# Table with results.
+# Adaboost model:
+as.data.frame(cbind(ntrees, rate_ada_holdout, rate_ada_train))
+```
+
+* Error rates for the Random Forest model:
+```{r, echo=FALSE}
+# Random forest model:
+as.data.frame(cbind(ntrees, rate_randomforest_holdout, rate_randomforest_train))
+```
+
+* Plot showing the error rates by model.
+```{r, echo=FALSE, fig.align='center', fig.height=4}
+# Dataframe to use ggplot()
+df <- data.frame(ntrees, error_rates= c(rate_ada_holdout, rate_ada_train, rate_randomforest_holdout, rate_randomforest_train), dataset  = rep(c("Hold-out", "Train", "Hold-out", "Train"), each=10), model = rep(c("Adaboost", "Adaboost",  "Random Forest", "Random Forest"), each=10))
+
+# Plot of error_rates vs ntrees:
+ggplot(df, aes(x = ntrees, y = error_rates, group = dataset, color = dataset)) + geom_line() + ggtitle("Plot of error rates vs number of trees") + xlab("Number of trees") + ylab("Error rate") + theme_light() + facet_grid(cols = vars(model))
+```
+From the plots above we can observe that the Adaboost model has higher error rates than the Random forest model for all the tree numbers considered. Also, the erro rates for the hold-out and the training data sets are more similar in the Adaboost model while in Random Forest the error rate for the training data set is really small compared to the rate for the hold-out data. Finally, we can also comment that the error rate in Adaboost decreases steadily as the number of trees to consider increases and the errors for the Random Forest model remain more or less the same (around 0.05 for the hold-out data), especially at from 40 number of trees. 
+
+# Assignment 2. Mixture models. 
+
+### 2.1. EM ALGORITHM EXPLANATION.[^1]
+[^1]:Source: Chapter 9 "Mixture models and EM" from the book "Pattern Recognition and Machine Learning" of Christopher M. Bishop.
+
+Let  $\boldsymbol{z}$ be a latent variable that denotes from which distribution the sample $\boldsymbol{x}=(x_1,x_2, \cdots,x_D)^T$ is coming from and the probability of observing $x$ given $\mu$ for a multivariate Bernoulli distribution:
+
+$$p(\boldsymbol{x}|\boldsymbol{\mu})=\prod_{d=1}^D\mu_{kd}^{x_d}(1-\mu_{kd})^{(1-x_d)}$$
+Then, the mixture model for a multivariate Bernoulli distribution is
+
+$$p(\boldsymbol{x}|\boldsymbol{\mu}, \boldsymbol{\pi})=\sum_{k=1}^K\pi_k \cdotp(\boldsymbol{x}|\boldsymbol{\mu}_k)$$
+where:
+ 
+  - $\pi$ are the mixing coefficients ($0 \le\pi_k \le 1$).
+  - $\mu$ are the Bernoulli parameters indicating probability of success ($0 \le\mu_k \le 1$).
+
+And the log-likelihood function for a sample of size N is: 
+
+$$\ln p(\boldsymbol{x}|\mu,\pi)=\sum_{n=1}^N \ln \Bigg[\sum_{k=1}^K \pi_k \cdot p(\boldsymbol{x}_n|\boldsymbol{\mu}_k)\Bigg]$$
+Our goal is to find maximum likelihood estimates for the parameters in the mixture model above, and in order to achieve that, the expectation–maximization (EM) algorithm will be implemented.
+
+The EM Algorithm has different steps:
+
+1. Set $\boldsymbol{\pi}$ and $\boldsymbol{\mu}$ to some initial values.
+
+2. *E step*: Compute the posterior distribution $p(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})$ for each point.
+    
+    2.1. This is calculated using the Bayes's rule: $p(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})=\frac{\pi_k \cdot p(\boldsymbol{x}_n|\boldsymbol{\mu}_k)}{\sum_{k=1}^K\pi_k \cdot p(\boldsymbol{x}_n|\boldsymbol{\mu}_k)}$$.
+   
+    2.2. Compute the ML estimation (log-likelihood function shown above).
+
+3. *M step*: Adjust $\pi$ and $\mu$ to fit points assigned to them:
+    
+    3.1. Set $\pi_k$ to $\pi_k^{ML}=\frac{\sum_{n=1}^N p(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})}{N}$.
+   
+    3.2. Set $\mu_{ki}$ to $\mu_{k}^{ML}=\frac{\sum_{n=1}^N x_n \cdot p(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})}{\sum_{n=1}^N p(z_{nk}|\boldsymbol{x}_n,\boldsymbol{\mu},\boldsymbol{\pi})}$.
+  
+4. Iterate until it converges (repeat until $\boldsymbol{\pi}$ and $\boldsymbol{\mu}$ don't change).
+
+### 2.2. RESULTS FOR K=2 COMPONENTS.
+```{r, echo=FALSE, fig.align='center', fig.height=3.7}
+# ----- K=2 ----- #
+### STEP 0. INITIALIZATING THE DATA 
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 2) # true mixing coefficients
+true_mu <- matrix(nrow=2, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+
+# 0.1. Producing the training data
+for(n in 1:N) {
+  k <- sample(1:2,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+K=2 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+### STEP 1. Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it){
+  Sys.sleep(0.5)
+  
+  ###  STEP 2. E-step: Computation of the fractional component assignments
+          
+   # 2.1. We have to compute bayes rule: p(z,x|mu,pi)/ sum(p(z,x|mu,pi))
+          
+          prob_x <- exp(x%*%log(t(mu))+(1-x)%*%log(t(1-mu)))
+          pi_prob_x <- prob_x * matrix(rep(pi, N), nrow=N, byrow =T) 
+          sum_pi_prob_x <- rowSums(pi_prob_x)
+
+          
+          z <- pi_prob_x/sum_pi_prob_x 
+
+  
+   # 2.2. Log likelihood computation. sum_N ln(sum_K pi * bernoulli)
+        
+          llik[it] <- sum(log(sum_pi_prob_x))
+          llik
+  
+  cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+  flush.console()
+  
+    # 2.2.1. Stop if the lok likelihood has not changed significantly
+        if(it > 1){
+          change <- abs(llik[it]-llik[it-1])
+          if(change < min_change){
+            break
+          }
+        }
+  
+  ###  STEP 3. M-step: ML parameter estimation from the data and fractional component assignments
+     # 3.1 Setting new mu. mu_ML= sum_kn(x*z)/sum_k(z)
+            mu <- (t(z)%*%x)/colSums(z)
+            
+     # 3.2. Setting new pi: pi_ML= sum_k(z)/N (of all n) 
+            pi <- colSums(z)/N
+            
+  ### Plot of the initial values:
+   if(it==1){
+    plot_mu <- mu
+    plot_pi <- pi
+  }
+}
+
+{plot(true_mu[1,], type="o", col="blue", ylim=c(0,1), main="Plot of the true values", xlab="Dimensions", ylab="True mu values")
+points(true_mu[2,], type="o", col="red")}
+
+par(mfrow=c(1,2), mar=c(3,2,2,1)+0.1)
+{plot(plot_mu[1,], type="o", col="blue", ylim=c(0,1), main = "Plot of the values in iteration 1", xlab="Dimensions", ylab="mu values")
+points(plot_mu[2,], type="o", col="red")}
+
+{plot(mu[1,], type="o", col="blue", ylim=c(0,1), main = "Plot of the final values", xlab="Dimensions", ylab="mu values")
+points(mu[2,], type="o", col="red")}
+cat("Pi values for K=2: ", "\n")
+pi
+cat("Mu values for K=2: ", "\n")
+mu
+par(mfrow=c(1,1), mar=c(5, 4, 4, 2) + 0.1)
+plot(llik[1:it], type="o", main="Log-likelihood values in each iteration", ylab="Log-likelihood", xlab="Iterations")
+```
+
+
+### 2.3. RESULTS FOR K=3 COMPONENTS.
+```{r, echo=FALSE, fig.align='center', fig.height=3.7}
+# ----- K=3 ----- #
+### STEP 0. INITIALIZATING THE DATA 
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+
+# 0.1. Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+K=3 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+### STEP 1. Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it){
+  Sys.sleep(0.5)
+  
+  ###  STEP 2. E-step: Computation of the fractional component assignments
+          
+   # 2.1. We have to compute bayes rule: p(z,x|mu,pi)/ sum(p(z,x|mu,pi))
+          
+          prob_x <- exp(x%*%log(t(mu))+(1-x)%*%log(t(1-mu)))
+          pi_prob_x <- prob_x * matrix(rep(pi, N), nrow=N, byrow =T) 
+          sum_pi_prob_x <- rowSums(pi_prob_x)
+
+          
+          z <- pi_prob_x/sum_pi_prob_x 
+
+  
+   # 2.2. Log likelihood computation. sum_N ln(sum_K pi * bernoulli)
+        
+          llik[it] <- sum(log(sum_pi_prob_x))
+          llik
+  
+  cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+  flush.console()
+  
+    # 2.2.1. Stop if the lok likelihood has not changed significantly
+        if(it > 1){
+          change <- abs(llik[it]-llik[it-1])
+          if(change < min_change){
+            break
+          }
+        }
+  
+  ###  STEP 3. M-step: ML parameter estimation from the data and fractional component assignments
+     # 3.1 Setting new mu. mu_ML= sum_kn(x*z)/sum_k(z)
+            mu <- (t(z)%*%x)/colSums(z)
+            
+     # 3.2. Setting new pi: pi_ML= sum_k(z)/N (of all n)
+             pi <- colSums(z)/N
+             
+  ### Plot of the initial values:
+   if(it==1){
+    plot_mu <- mu
+    plot_pi <- pi
+  }
+}
+
+{plot(true_mu[1,], type="o", col="blue", ylim=c(0,1), main="Plot of the true values", xlab="Dimensions", ylab="True mu values")
+points(true_mu[2,], type="o", col="red")
+points(true_mu[3,], type="o", col="green")}
+
+par(mfrow=c(1,2), mar=c(3,2,2,1)+0.1)
+{plot(plot_mu[1,], type="o", col="blue", ylim=c(0,1), main = "Plot of the values in iteration 1", xlab="Dimensions", ylab="mu values")
+points(plot_mu[2,], type="o", col="red")
+points(plot_mu[3,], type="o", col="green")}
+
+{plot(mu[1,], type="o", col="blue", ylim=c(0,1), main = "Plot of the final values", xlab="Dimensions", ylab="mu values")
+points(mu[2,], type="o", col="red")
+points(mu[3,], type="o", col="green")}
+
+cat("Pi values for K=3: ", "\n")
+pi
+cat("Mu values for K=3: ", "\n")
+mu
+
+par(mfrow=c(1,1), mar=c(5, 4, 4, 2) + 0.1)
+plot(llik[1:it], type="o", main="Log-likelihood values in each iteration", ylab="Log-likelihood", xlab="Iterations")
+```
+
+### 2.4. RESULTS FOR K=4 COMPONENTS.
+```{r, echo=FALSE, fig.align='center', fig.height=3.5}
+# ----- K=4 ----- #
+### STEP 0. INITIALIZATING THE DATA 
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 4) # true mixing coefficients
+true_mu <- matrix(nrow=4, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+true_mu[4,]=c(0.2,1.0,0.8,0.2,0.6,0.3,0.1,0.8,0.8,0.0)
+
+# 0.1. Producing the training data
+for(n in 1:N) {
+  k <- sample(1:4,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+K=4 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+### STEP 1. Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it){
+  Sys.sleep(0.5)
+  
+  ###  STEP 2. E-step: Computation of the fractional component assignments
+          
+   # 2.1. We have to compute bayes rule: p(z,x|mu,pi)/ sum(p(z,x|mu,pi))
+          
+          prob_x <- exp(x%*%log(t(mu))+(1-x)%*%log(t(1-mu)))
+          pi_prob_x <- prob_x * matrix(rep(pi, N), nrow=N, byrow =T) 
+          sum_pi_prob_x <- rowSums(pi_prob_x)
+
+          
+          z <- pi_prob_x/sum_pi_prob_x 
+
+  
+   # 2.2. Log likelihood computation. sum_N ln(sum_K pi * bernoulli)
+        
+          llik[it] <- sum(log(sum_pi_prob_x))
+          llik
+  
+  cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+  flush.console()
+  
+    # 2.2.1. Stop if the lok likelihood has not changed significantly
+        if(it > 1){
+          change <- abs(llik[it]-llik[it-1])
+          if(change < min_change){
+            break
+          }
+        }
+  
+  ###  STEP 3. M-step: ML parameter estimation from the data and fractional component assignments
+     # 3.1 Setting new mu. mu_ML= sum_kn(x*z)/sum_k(z)
+            
+            mu <- (t(z)%*%x)/colSums(z)
+     # 3.2. Setting new pi: pi_ML= sum_k(z)/N (of all n)
+
+            pi <- colSums(z)/N
+            
+  ### Plot of the initial values:
+   if(it==1){
+    plot_mu <- mu
+    plot_pi <- pi
+  }
+}
+
+{plot(true_mu[1,], type="o", col="blue", ylim=c(0,1), main="Plot of the true values", xlab="Dimensions", ylab="True mu values")
+points(true_mu[2,], type="o", col="red")
+points(true_mu[3,], type="o", col="green")
+points(true_mu[4,], type="o", col="black")}
+
+par(mfrow=c(1,2), mar=c(3,2,2,1)+0.1)
+{plot(plot_mu[1,], type="o", col="blue", ylim=c(0,1), main = "Plot of the values in iteration 1", xlab="Dimensions", ylab="mu values")
+points(plot_mu[2,], type="o", col="red")
+points(plot_mu[3,], type="o", col="green")
+points(plot_mu[4,], type="o", col="black")}
+
+{plot(mu[1,], type="o", col="blue", ylim=c(0,1), main = "Plot of the final values", xlab="Dimensions", ylab="mu values")
+points(mu[2,], type="o", col="red")
+points(mu[3,], type="o", col="green")
+points(mu[4,], type="o", col="black")}
+
+cat("Pi values for K=4: ", "\n")
+pi
+cat("Mu values for K=4: ", "\n")
+mu
+
+par(mfrow=c(1,1), mar=c(5, 4, 4, 2) + 0.1)
+plot(llik[1:it], type="o", main="Log-likelihood values in each iteration", ylab="Log-likelihood", xlab="Iterations")
+```
+
+### 2.5. ANALYSIS OF RESULTS. 
+
+The number of iterations for K= 2,3,4 has been 11, 26 and 54, respectively. Also, comparing the plots of the true and the final $\mu$ values in each case, we can observe that with $K=2$ both plots are quite similar (almost the same) while when increasing $K$'s, the final results are every time more different than the true values. So we see that when $K=4$, the $\mu$ estimations obtained with the EM algorithm are not as good as when $K$ is smaller. 
+
+# Appendix. 
+
+## Assignment 1. Ensemble Methods. 
+
+**1.0. Initialization.**
+```{r, eval=FALSE}
+# Changing the version:
+RNGversion('3.5.1')
+
+# Loading the packages
+library(mboost)
+library(randomForest)
+library(ggplot2)
+
+# Importing the data:
+sp <- read.csv2("spambase.csv")
+sp$Spam <- as.factor(sp$Spam)
+
+# Spliting the data in training and hold-out datasets:
+n=dim(sp)[1]
+set.seed(12345)
+id=sample(1:n, floor(n*(2/3)))
+train=sp[id,]
+holdout=sp[-id,]
+```
+
+**1.1. Adaboost classification tree.**
+```{r, eval=FALSE}
+# Number of trees to consider.
+ntrees <- seq(10, 100, by = 10)
+
+rate_ada_holdout <- vector()
+rate_ada_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_ada <- blackboost(Spam~., data = train, family = AdaExp(), control=boost_control(mstop = i)) 
+          # "AdaExp() uses the exponential loss, which essentially leads to the AdaBoost algorithm"
+          # "mstop = an integer giving the number of initial boosting iterations."
+  
+  # Predictions
+  fitted_ada_holdout <- predict(fit_ada, newdata = holdout, type = "class")
+  fitted_ada_train <- predict(fit_ada, newdata = train, type = "class")
+  
+  # Error rates
+  rate_ada_holdout[(i/10)] <- mean(fitted_ada_holdout != holdout$Spam)
+  rate_ada_train[(i/10)] <- mean(fitted_ada_train != train$Spam)
+}
+```
+
+**1.2. Random forest model.**
+```{r, eval=FALSE}
+rate_randomforest_holdout <- vector()
+rate_randomforest_train <- vector()
+for(i in ntrees){
+  # Fitting the model with the training dataset
+  fit_randomforest <- randomForest(Spam~., data = train, ntree=i) #ntree="Number of trees to grow."
+
+  # Predictions
+  fitted_randomforest_holdout <- predict(fit_randomforest, newdata = holdout, type = "class")
+  fitted_randomforest_train <- predict(fit_randomforest, newdata = train, type = "class")
+
+  # Error rates
+  rate_randomforest_holdout[(i/10)] <- mean(fitted_randomforest_holdout != holdout$Spam)
+  rate_randomforest_train[(i/10)] <- mean(fitted_randomforest_train != train$Spam)
+}
+```
+
+**1.3. Performance evaluation.**
+```{r, eval=FALSE}
+# Table with results.
+# Adaboost model:
+as.data.frame(cbind(ntrees, rate_ada_holdout, rate_ada_train))
+
+# Random forest model:
+as.data.frame(cbind(ntrees, rate_randomforest_holdout, rate_randomforest_train))
+
+# Dataframe to use ggplot()
+df <- data.frame(ntrees, error_rates= c(rate_ada_holdout, rate_ada_train, 
+                                        rate_randomforest_holdout, rate_randomforest_train), 
+                 dataset  = rep(c("Hold-out", "Train", "Hold-out", "Train"), each=10), 
+                 model = rep(c("Adaboost", "Adaboost",  "Random Forest", "Random Forest"), each=10))
+
+# Plot of error_rates vs ntrees:
+ggplot(df, aes(x = ntrees, y = error_rates, group = dataset, color = dataset)) + 
+  geom_line() + ggtitle("Plot of error rates vs number of trees") + 
+  xlab("Number of trees") + ylab("Error rate") + 
+  theme_light() + facet_grid(cols = vars(model))
+```
+
+## Assignment 2. Mixture models. 
+
+**FOR K=2.**
+```{r, eval=FALSE}
+# ----- K=2 ----- #
+### STEP 0. INITIALIZATING THE DATA 
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 2) # true mixing coefficients
+true_mu <- matrix(nrow=2, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+
+# 0.1. Producing the training data
+for(n in 1:N) {
+  k <- sample(1:2,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+K=2 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+### STEP 1. Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it){
+  Sys.sleep(0.5)
+  
+  ###  STEP 2. E-step: Computation of the fractional component assignments
+          
+   # 2.1. We have to compute bayes rule: p(z,x|mu,pi)/ sum(p(z,x|mu,pi))
+          
+          prob_x <- exp(x%*%log(t(mu))+(1-x)%*%log(t(1-mu)))
+          pi_prob_x <- prob_x * matrix(rep(pi, N), nrow=N, byrow =T) 
+          sum_pi_prob_x <- rowSums(pi_prob_x)
+
+          
+          z <- pi_prob_x/sum_pi_prob_x 
+
+  
+   # 2.2. Log likelihood computation. sum_N ln(sum_K pi * bernoulli)
+        
+          llik[it] <- sum(log(sum_pi_prob_x))
+          llik
+  
+  cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+  flush.console()
+  
+    # 2.2.1. Stop if the lok likelihood has not changed significantly
+        if(it > 1){
+          change <- abs(llik[it]-llik[it-1])
+          if(change < min_change){
+            break
+          }
+        }
+  
+  ###  STEP 3. M-step: ML parameter estimation from the data and fractional component assignments
+     # 3.1 Setting new mu. mu_ML= sum_kn(x*z)/sum_k(z)
+            mu <- (t(z)%*%x)/colSums(z)
+            
+     # 3.2. Setting new pi: pi_ML= sum_k(z)/N (of all n) 
+            pi <- colSums(z)/N
+            
+  ### Plot of the initial values:
+   if(it==1){
+    plot_mu <- mu
+    plot_pi <- pi
+  }
+}
+
+{plot(true_mu[1,], type="o", col="blue", ylim=c(0,1), main="Plot of the true values", 
+      xlab="Dimensions", ylab="True mu values")
+points(true_mu[2,], type="o", col="red")}
+
+par(mfrow=c(1,2), mar=c(3,2,2,1)+0.1)
+{plot(plot_mu[1,], type="o", col="blue", ylim=c(0,1),
+      main = "Plot of the values in iteration 1", xlab="Dimensions", ylab="mu values")
+points(plot_mu[2,], type="o", col="red")}
+
+{plot(mu[1,], type="o", col="blue", ylim=c(0,1), 
+      main = "Plot of the final values", xlab="Dimensions", ylab="mu values")
+points(mu[2,], type="o", col="red")}
+cat("Pi values for K=2: ", "\n")
+pi
+cat("Mu values for K=2: ", "\n")
+mu
+par(mfrow=c(1,1), mar=c(5, 4, 4, 2) + 0.1)
+plot(llik[1:it], type="o", main="Log-likelihood values in each iteration", 
+     ylab="Log-likelihood", xlab="Iterations")
+```
+
+
+**FOR K=3.**
+```{r, eval=FALSE}
+# ----- K=3 ----- #
+### STEP 0. INITIALIZATING THE DATA 
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 3) # true mixing coefficients
+true_mu <- matrix(nrow=3, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+
+# 0.1. Producing the training data
+for(n in 1:N) {
+  k <- sample(1:3,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+K=3 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+### STEP 1. Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it){
+  Sys.sleep(0.5)
+  
+  ###  STEP 2. E-step: Computation of the fractional component assignments
+          
+   # 2.1. We have to compute bayes rule: p(z,x|mu,pi)/ sum(p(z,x|mu,pi))
+          
+          prob_x <- exp(x%*%log(t(mu))+(1-x)%*%log(t(1-mu)))
+          pi_prob_x <- prob_x * matrix(rep(pi, N), nrow=N, byrow =T) 
+          sum_pi_prob_x <- rowSums(pi_prob_x)
+
+          
+          z <- pi_prob_x/sum_pi_prob_x 
+
+  
+   # 2.2. Log likelihood computation. sum_N ln(sum_K pi * bernoulli)
+        
+          llik[it] <- sum(log(sum_pi_prob_x))
+          llik
+  
+  cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+  flush.console()
+  
+    # 2.2.1. Stop if the lok likelihood has not changed significantly
+        if(it > 1){
+          change <- abs(llik[it]-llik[it-1])
+          if(change < min_change){
+            break
+          }
+        }
+  
+  ###  STEP 3. M-step: ML parameter estimation from the data and fractional component assignments
+     # 3.1 Setting new mu. mu_ML= sum_kn(x*z)/sum_k(z)
+            mu <- (t(z)%*%x)/colSums(z)
+            
+     # 3.2. Setting new pi: pi_ML= sum_k(z)/N (of all n)
+             pi <- colSums(z)/N
+             
+  ### Plot of the initial values:
+   if(it==1){
+    plot_mu <- mu
+    plot_pi <- pi
+  }
+}
+
+{plot(true_mu[1,], type="o", col="blue", ylim=c(0,1), main="Plot of the true values", 
+      xlab="Dimensions", ylab="True mu values")
+points(true_mu[2,], type="o", col="red")
+points(true_mu[3,], type="o", col="green")}
+
+par(mfrow=c(1,2), mar=c(3,2,2,1)+0.1)
+{plot(plot_mu[1,], type="o", col="blue", ylim=c(0,1), 
+      main = "Plot of the values in iteration 1", xlab="Dimensions", ylab="mu values")
+points(plot_mu[2,], type="o", col="red")
+points(plot_mu[3,], type="o", col="green")}
+
+{plot(mu[1,], type="o", col="blue", ylim=c(0,1), 
+      main = "Plot of the final values", xlab="Dimensions", ylab="mu values")
+points(mu[2,], type="o", col="red")
+points(mu[3,], type="o", col="green")}
+
+cat("Pi values for K=3: ", "\n")
+pi
+cat("Mu values for K=3: ", "\n")
+mu
+
+par(mfrow=c(1,1), mar=c(5, 4, 4, 2) + 0.1)
+plot(llik[1:it], type="o", main="Log-likelihood values in each iteration",
+     ylab="Log-likelihood", xlab="Iterations")
+```
+
+**FOR K=4.**
+```{r, eval=FALSE}
+# ----- K=4 ----- #
+### STEP 0. INITIALIZATING THE DATA 
+set.seed(1234567890)
+max_it <- 100 # max number of EM iterations
+min_change <- 0.1 # min change in log likelihood between two consecutive EM iterations
+N=1000 # number of training points
+D=10 # number of dimensions
+x <- matrix(nrow=N, ncol=D) # training data
+
+true_pi <- vector(length = 4) # true mixing coefficients
+true_mu <- matrix(nrow=4, ncol=D) # true conditional distributions
+true_pi=c(1/3, 1/3, 1/3, 1/3)
+true_mu[1,]=c(0.5,0.6,0.4,0.7,0.3,0.8,0.2,0.9,0.1,1)
+true_mu[2,]=c(0.5,0.4,0.6,0.3,0.7,0.2,0.8,0.1,0.9,0)
+true_mu[3,]=c(0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5,0.5)
+true_mu[4,]=c(0.2,1.0,0.8,0.2,0.6,0.3,0.1,0.8,0.8,0.0)
+
+# 0.1. Producing the training data
+for(n in 1:N) {
+  k <- sample(1:4,1,prob=true_pi)
+  for(d in 1:D) {
+    x[n,d] <- rbinom(1,1,true_mu[k,d])
+  }
+}
+
+K=4 # number of guessed components
+z <- matrix(nrow=N, ncol=K) # fractional component assignments
+pi <- vector(length = K) # mixing coefficients
+mu <- matrix(nrow=K, ncol=D) # conditional distributions
+llik <- vector(length = max_it) # log likelihood of the EM iterations
+
+### STEP 1. Random initialization of the paramters
+pi <- runif(K,0.49,0.51)
+pi <- pi / sum(pi)
+for(k in 1:K) {
+  mu[k,] <- runif(D,0.49,0.51)
+}
+
+for(it in 1:max_it){
+  Sys.sleep(0.5)
+  
+  ###  STEP 2. E-step: Computation of the fractional component assignments
+          
+   # 2.1. We have to compute bayes rule: p(z,x|mu,pi)/ sum(p(z,x|mu,pi))
+          
+          prob_x <- exp(x%*%log(t(mu))+(1-x)%*%log(t(1-mu)))
+          pi_prob_x <- prob_x * matrix(rep(pi, N), nrow=N, byrow =T) 
+          sum_pi_prob_x <- rowSums(pi_prob_x)
+
+          
+          z <- pi_prob_x/sum_pi_prob_x 
+
+  
+   # 2.2. Log likelihood computation. sum_N ln(sum_K pi * bernoulli)
+        
+          llik[it] <- sum(log(sum_pi_prob_x))
+          llik
+  
+  cat("iteration: ", it, "log likelihood: ", llik[it], "\n")
+  flush.console()
+  
+    # 2.2.1. Stop if the lok likelihood has not changed significantly
+        if(it > 1){
+          change <- abs(llik[it]-llik[it-1])
+          if(change < min_change){
+            break
+          }
+        }
+  
+  ###  STEP 3. M-step: ML parameter estimation from the data and fractional component assignments
+     # 3.1 Setting new mu. mu_ML= sum_kn(x*z)/sum_k(z)
+            
+            mu <- (t(z)%*%x)/colSums(z)
+     # 3.2. Setting new pi: pi_ML= sum_k(z)/N (of all n)
+
+            pi <- colSums(z)/N
+            
+  ### Plot of the initial values:
+   if(it==1){
+    plot_mu <- mu
+    plot_pi <- pi
+  }
+}
+
+{plot(true_mu[1,], type="o", col="blue", ylim=c(0,1), main="Plot of the true values",
+      xlab="Dimensions", ylab="True mu values")
+points(true_mu[2,], type="o", col="red")
+points(true_mu[3,], type="o", col="green")
+points(true_mu[4,], type="o", col="black")}
+
+par(mfrow=c(1,2), mar=c(3,2,2,1)+0.1)
+{plot(plot_mu[1,], type="o", col="blue", ylim=c(0,1), 
+      main = "Plot of the values in iteration 1", xlab="Dimensions", ylab="mu values")
+points(plot_mu[2,], type="o", col="red")
+points(plot_mu[3,], type="o", col="green")
+points(plot_mu[4,], type="o", col="black")}
+
+{plot(mu[1,], type="o", col="blue", ylim=c(0,1), 
+      main = "Plot of the final values", xlab="Dimensions", ylab="mu values")
+points(mu[2,], type="o", col="red")
+points(mu[3,], type="o", col="green")
+points(mu[4,], type="o", col="black")}
+
+cat("Pi values for K=4: ", "\n")
+pi
+cat("Mu values for K=4: ", "\n")
+mu
+
+par(mfrow=c(1,1), mar=c(5, 4, 4, 2) + 0.1)
+plot(llik[1:it], type="o", main="Log-likelihood values in each iteration", 
+     ylab="Log-likelihood", xlab="Iterations")
+```

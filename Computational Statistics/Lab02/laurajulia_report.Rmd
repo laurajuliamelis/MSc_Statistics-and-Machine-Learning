@@ -1,0 +1,203 @@
+---
+title: 'Computational Statistics: Computer lab 2.'
+author: "Laura Julià Melis"
+date: "2/07/2020"
+output: pdf_document
+---
+
+# Question 1: Optimizing a model parameter
+
+**The file `mortality_rate.csv` contains information about mortality rates of the fruit flies during a certain period.**
+
+**1. Import this file to `R` and add one more variable `LMR` to the data which is the natural logarithm of `Rate`. Afterwards, divide the data into training and test sets by using the following code:**
+
+```{r}
+##### QUESTION 1 #####
+# 1.1. Importing data, adding LMR and dividing the dataset
+data <- read.table("mortality_rate.csv", header= TRUE, sep=";", dec=",")
+data$LMR <- log(data$Rate)
+
+n=dim(data)[1]
+set.seed (123456) 
+id=sample(1:n, floor(n*0.5)) 
+train=data[id, ]
+test=data[-id, ]
+
+```
+
+
+**2. Write your own function `myMSE()` that for given parameters $\lambda$ and list `pars` containing vectors `X`, `Y`, `Xtest`, `Ytest` fits a LOESS model with response Y and predictor X using loess() function with penalty $\lambda$ (parameter `enp.target` in `loess()`) and then predicts the model for `Xtest`. The function should compute the predictive MSE, print it and return as a result. The predictive MSE is the mean square error of the prediction on the testing data. It is defined by the following Equation (for you to implement):**
+
+$$\text{predictive MSE} = \frac{1}{\text{length(test)}} \sum_{\text{ith element in test set}} (\text{Ytest[i]}- \text{fYpred(X[i])})^2$$
+
+**where `fYpred(X[i])` is the predicted value of `Y` if `X` is `X[i]`. Read on R’s functions for prediction so that you do not have to implement it yourself.**
+
+```{r}
+# 1.2. Creating function myMSE.
+myMSE <- function(lambda, pars){
+  pred <- vector(length = length(lambda))
+  for(i in 1:length(lambda)){
+    fit <- loess(Y ~ X, pars, enp.target = lambda[i])
+    fYpred <- predict(fit, data=pars$X)
+    pred[i] <- (1/length(pars$Xtest)) * (sum( (pars$Ytest - fYpred)^2 )) 
+  }
+  return(pred)
+}
+
+```
+
+
+**3. Use a simple approach: use function `myMSE()`, training and test sets with response LMR and predictor Day and the following $\lambda$ values to estimate the predictive MSE values: $\lambda = 0.1,0.2,...,40$**
+
+```{r}
+# 1.3. Estimating predictive MSE values.
+lambda <- seq(0.1, 40, by= 0.1)
+pars <- list(X=train$Day , Y=train$LMR , Xtest=test$Day , Ytest=test$LMR)
+mse <- myMSE(lambda, pars)
+
+```
+
+**4. Create a plot of the MSE values versus $\lambda$ and comment on which $\lambda$ value is optimal. How many evaluations of `myMSE()` were required (read `?optimize`) to find this value?**
+
+* Plot:
+```{r, echo=FALSE, fig.align='center', fig.height=3}
+# 1.4. Plot of MSE vs lambda
+library(ggplot2)
+df <- data.frame(lambda= lambda, MSE = mse)
+
+ggplot(df, aes(x=lambda, y=MSE)) + geom_point() + geom_line() +
+  ggtitle("Plot of MSE vs lambda") + theme_light()
+```
+
+```{r, echo=FALSE}
+# 1.4.a. Minimum MSE and optimal lambda
+cat ("The optimal lambda is:", df$lambda[which(min(df$MSE)== df$MSE)],
+     "and the minimum MSE value is:", min(df$MSE)) 
+
+```
+
+The function `myMSE()` has been evaluated for all the 400 different values of $\lambda$. We haven't set any tolerance to indicate the MSE that it should stop if the two last MSE computations are "too close".  
+
+**5. Use `optimize()` function for the same purpose, specify range for search [0.1,40] and the accuracy 0.01. Have the function managed to find the optimal MSE value? How many `myMSE()` function evaluations were required? Compare to step 4.**
+```{r, echo=FALSE}
+# 1.5. Finding optimal MSE with optimize()
+optimize(myMSE, c(0.1,40), tol=0.01, pars=pars)
+
+```
+
+
+**6. Use optim() function and BFGS method with starting point $\lambda = 35$ to find the optimal $\lambda$ value. How many `myMSE()` function evaluations were required (read `?optim`)? Compare the results you obtained with the results from step 5 and make conclusions.**
+```{r, echo=FALSE}
+# 1.6. Finding optimal lambda with BFGS method.
+optim(par=35, fn = myMSE, method= "BFGS", pars=pars)
+
+
+```
+
+\newpage
+# Question 2: Maximizing likelihood
+
+**The file data.RData contains a sample from normal distribution with some parameters $\mu, \sigma$. For this question read `?optim` in detail.**
+
+**1. Load the data to R environment.**
+
+*See appendix to see the code*
+```{r, echo=FALSE}
+##### QUESTION 2 #####
+# 2.1. Loading data
+load("data.RData")
+
+```
+
+**2. Write down the log-likelihood function for 100 observations and derive maximum likelihood estimators for $\mu, \sigma$ analytically by setting partial derivatives to zero. Use the derived formulae to obtain parameter estimates for the loaded data.**
+
+Given an i.i.d. sample $(X_1, \dots, X_n)$ of $n=100$ observations that comes from a normal distribution, $N(\mu, \sigma)$, its probability distribution is: 
+
+$$P(X|\mu, \sigma)= \frac{1}{\sigma\sqrt{2\pi}}\cdot\exp \bigg[ -\frac{1}{2}\bigg(\frac{x-\mu}{\sigma}\bigg)^2 \bigg]$$
+
+And the log-likelihood function is the joint probability of all the $100$ observations is: 
+
+$$L(\mu,\sigma)=P(X_1, \dots, X_{100}|\mu, \sigma)= \prod^{100}_{i=1}P(X_i|\mu, \sigma)= \bigg( \frac{1}{\sigma\sqrt{2\pi}}\bigg)^n \cdot \exp \bigg[ -\frac{1}{2\sigma^2} \sum^{100}_{i=1} (x_i-\mu)^2 \bigg]$$
+So now we have to do the logarithm of the log-likelihood function:
+
+$$\log(L(\mu,\sigma)) =\log \Bigg( \bigg( \frac{1}{\sigma\sqrt{2\pi}}\bigg)^n \cdot \exp \bigg[ -\frac{1}{2\sigma^2} \sum^{100}_{i=1} (x_i-\mu)^2 \bigg] \Bigg) = \log\bigg( \frac{1}{\sigma\sqrt{2\pi}}\bigg)^n -\frac{1}{2\sigma^2} \sum^{100}_{i=1} (x_i-\mu)^2 \log(e) =$$
+$$= n \bigg(\log\bigg(\frac{1}{\sigma}\bigg) + \log\bigg(\frac{1}{\sqrt{2\pi}}\bigg) \bigg) -\frac{1}{2\sigma^2} \sum^{100}_{i=1} (x_i-\mu)^2 = n \big(\log(\sigma)^{-1} + \log(2\pi)^{-1/2} \big) -\frac{1}{2\sigma^2} \sum^{100}_{i=1} (x_i-\mu)^2.$$
+So, the log-likelihood function for 100 observations is as follows:
+$$\boxed{\log(L(\mu,\sigma)) = -n \log(\sigma) -\frac{n}{2} \log(2\pi) -\frac{1}{2\sigma^2} \sum^{n=100}_{i=1} (x_i-\mu)^2}$$
+
+Now, to find the maximum likelihood estimators for $\mu$ and $\sigma$, we will derivate $\log(L(\mu,\sigma))$, set the equations to 0 and isolate the parameters: 
+
+* For $\mu$:
+
+$$(1) \quad \frac{\partial \log(L(\mu,\sigma)) }{\partial \mu}= -0-0-\bigg(0 -\frac{1}{2\sigma^2} 2 \sum^{100}_{i=1} (x_i-\mu)(0-1) \bigg) = +\frac{1}{\sigma^2} \sum^{100}_{i=1} (x_i)-n\mu$$
+$$(2) \quad \frac{1}{\sigma^2} \sum^{100}_{i=1} (x_i)-n\mu= 0 \rightarrow \sum^{100}_{i=1} (x_i)-n\mu= 0  \rightarrow n\mu =\sum^{100}_{i=1} x_i \rightarrow \boxed{\mu_{ML}= \frac{1}{100}\sum^{100}_{i=1} x_i}$$
+
+
+* For $\sigma$:
+
+$$(1) \quad\frac{\partial \log(L(\mu,\sigma)) }{\partial \sigma}= -0 -\frac{n}{\sigma}-0 -\frac{0-4\sigma}{4\sigma^4}\sum^{100}_{i=1} (x_i-\mu)= -\frac{n}{\sigma} + \frac{1}{\sigma^3}\sum^{100}_{i=1} (x_i-\mu)^2$$
+$$(2) \quad -\frac{n}{\sigma} - \frac{1}{\sigma^3}\sum^{100}_{i=1} (x_i-\mu)^2=0 \rightarrow n\sigma^3=-\sigma\sum^{100}_{i=1} (x_i-\mu)^2 \rightarrow \frac{\sigma^3}{\sigma}=\frac{\sum^{100}_{i=1}(x_i-\mu)^2 }{n} \rightarrow \boxed{\sigma_{ML}=\sqrt{\frac{\sum^{100}_{i=1}(x_i-\mu)^2 }{n}}}$$
+
+Finally, we will use these formulae to obtain the maximum likelihood estimations for the data (*See appendix to see the implementation with R*). 
+
+The results obtained are:
+
+```{r, echo=FALSE}
+# 2.2. Use the derived formulae to obtain parameter estimates for the loaded data
+n <- length(data)
+mu_ml <- (1/n) * sum(data) 
+sigma_ml <- sqrt( sum( (data-mean(data))^2 ) / n )
+cat("The estimated mu is:", mu_ml, "and the estimaded sigma is", sigma_ml)
+
+```
+
+
+**3. Optimize the minus log–likelihood function with initial parameters $\mu=0, \sigma =1$. Try both Conjugate Gradient method (described in the presentation handout) and BFGS (discussed in the lecture) algorithm with gradient specified and without. Why it is a bad idea to maximize likelihood rather than maximizing log–likelihood?**
+
+To optimize the minus log–likelihood we want to minimize it (which is the same than maximizing the log-likelihood). To do so, we have created a function that computes the log–likelihood and then we have used it in the `optim()` function: once with `method="CG"` and the other one with `method="BFGS"`.
+
+```{r, echo=FALSE}
+# 2.3. Optimize the minus log–likelihood function
+## A. Writing function that calculates the log-likelihood
+llik <- function(x, data){
+  n <- length(data)
+  mu <- x[1]
+  sigma <- x[2]
+  result <- ( -n*log(sigma) ) - ( (n/2)*log(2*pi) ) - ( sum( (data-mu)^2 ) / (2*sigma^2) )
+  return(result)
+}
+
+```
+
+
+The results obtained are:
+
+* For the Conjugate Gradient method:
+
+```{r, echo=FALSE}
+## B. Using optim()
+### Conjugate gradient method:
+# cg <- optim(c(0,1), fn = llik, method= "CG", data=data)
+
+```
+
+* For the BFGS algorithm: 
+
+```{r, echo=FALSE}
+### BFGS method:
+# bfgs <- optim(par=c(0,1), fn = llik, method= "BFGS", data=data)
+
+```
+
+It is better to maximize the log-likelihood rather than the likelihood function itself because...
+
+https://math.stackexchange.com/questions/892832/why-we-consider-log-likelihood-instead-of-likelihood-in-gaussian-distribution
+
+**4. Did the algorithms converge in all cases? What were the optimal values of parameters and how many function and gradient evaluations were required for algorithms to converge? Which settings would you recommend?**
+
+
+\newpage
+# Appendix
+
+```{r ref.label=knitr::all_labels(), echo = T, eval = F}
+```
